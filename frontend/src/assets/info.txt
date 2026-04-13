@@ -1,1 +1,0 @@
-Arquivo para manter a pasta ativa no git.
