@@ -3,6 +3,7 @@ import { Card } from "../../../common/components/Card";
 import { Input } from "../../../common/components/Input";
 import { Button } from "../../../common/components/Button";
 import { useAuth } from "../hooks/Auth";
+import { useLoginBtn } from "../hooks/LoginBtn";
 
 export const Login: React.FC = () => {
     const { user, 
@@ -12,6 +13,12 @@ export const Login: React.FC = () => {
             handlePasswordChange, 
             passwordError
         } = useAuth();
+
+        const { isLoading, handleLoginSubmit } = useLoginBtn({
+        user,
+        password,
+        hasErrors: !!userError || !!passwordError
+    });
     return (
         <Card
             title="Login"
@@ -20,7 +27,7 @@ export const Login: React.FC = () => {
             classTitle="card-title"
             classCardContent="card-content"
             contentCard={
-                <form className="login-form">
+                <form className="login-form" onSubmit={handleLoginSubmit}>
                     <Input
                         label="Usuário"
                         value={user}
@@ -39,10 +46,11 @@ export const Login: React.FC = () => {
                         type="password"
                     />
                     <Button
-                        isLoading={false}
-                        contentBtn="Entrar"
+                        isLoading={isLoading}
+                        contentBtn={isLoading ? "Entrando..." : "Entrar"}
                         classSpan="login-btn-span"
                         classBtn="login-btn"
+                        disabled={isLoading || !!userError || !!passwordError || !user}
                     />
                 </form>
             }

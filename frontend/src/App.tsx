@@ -1,12 +1,9 @@
-import { useState } from 'react'
-import './common/styles/global.css'
+import React from 'react';
+import { AppRoutes } from './routes';
+import './common/styles/global.css';
 
-function App() {
-  return (
-    <div>
-      <h1>🏛️ Sistema Iniciado</h1>
-    </div>
-  );
-}
+const App: React.FC = () => {
+  return <AppRoutes />;
+};
 
 export default App;
