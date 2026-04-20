@@ -5,14 +5,18 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     error?: string;
     classLabel?: string;
     classInput?: string;
+    classError?: string;
 }
 
-export const Input: React.FC<InputProps> = ({ label, error, classLabel, classInput, ...rest }) => {
+export const Input: React.FC<InputProps> = ({ label, error, classLabel, classInput, classError, ...rest }) => {
     return (
         <div>
             {label && <label className={classLabel}>{label}</label>}
-            <input className={classInput} {...rest} />
-            {error && <span className="text-danger">{error}</span>}
+            <input 
+                className={`${classInput} ${error ? "is-invalid" : ""}`} 
+                {...rest} 
+            />
+            {error && <span className={classError || "text-danger"}>{error}</span>}
         </div>
     );
 };

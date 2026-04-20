@@ -2,11 +2,16 @@ import React from "react";
 import { Card } from "../../../common/components/Card";
 import { Input } from "../../../common/components/Input";
 import { Button } from "../../../common/components/Button";
-import { useAuth } from "../../../common/hooks/Auth";
+import { useAuth } from "../hooks/Auth";
 
 export const Login: React.FC = () => {
-    const { user, setUser, password, setPassword } = useAuth();
-
+    const { user, 
+            handleUserChange, 
+            userError, 
+            password, 
+            handlePasswordChange, 
+            passwordError
+        } = useAuth();
     return (
         <Card
             title="Login"
@@ -19,14 +24,16 @@ export const Login: React.FC = () => {
                     <Input
                         label="Usuário"
                         value={user}
-                        onChange={(e) => setUser(e.target.value)}
+                        onChange={handleUserChange}
+                        error={userError}
                         classLabel="login-label"
                         classInput="login-input"
                     />
                     <Input
                         label="Senha"
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={handlePasswordChange}
+                        error={passwordError}
                         classLabel="login-label"
                         classInput="login-input"
                         type="password"
