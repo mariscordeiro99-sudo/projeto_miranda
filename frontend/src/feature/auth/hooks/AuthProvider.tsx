@@ -4,6 +4,7 @@ import { AuthContext } from "./AuthContext";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState("");
+    const [loggedUser, setLoggedUser] = useState<string | null>(null);
     const [password, setPassword] = useState("");
     const [userError, setUserError] = useState("");
     const [passwordError, setPasswordError] = useState("");
@@ -43,7 +44,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const contextValue: AuthContextType = { 
         user, 
-        setUser, 
+        setUser,
+        loggedUser,
+        setLoggedUser, 
         password, 
         setPassword, 
         handleUserChange, 

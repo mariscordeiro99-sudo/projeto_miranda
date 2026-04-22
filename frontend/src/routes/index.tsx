@@ -1,11 +1,11 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../feature/auth/hooks/Auth';
-import { AuthRoutes } from './loginRoute';
+import { AuthRoutes } from './LoginRoute';
 
 export const AppRoutes: React.FC = () => {
-  const { user } = useAuth();
-  const isAuthenticated = !!user;
+  const { loggedUser } = useAuth();
+  const isAuthenticated = !!loggedUser;
 
   return (
     <Routes>

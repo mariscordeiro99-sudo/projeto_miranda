@@ -8,7 +8,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     classError?: string;
 }
 
-export const Input: React.FC<InputProps> = ({ label, error, classLabel, classInput, classError, ...rest }) => {
+export const Input: React.FC<InputProps> = ({ label, error, classLabel, classInput, ...rest }) => {
     return (
         <div>
             {label && <label className={classLabel}>{label}</label>}
@@ -16,7 +16,6 @@ export const Input: React.FC<InputProps> = ({ label, error, classLabel, classInp
                 className={`${classInput} ${error ? "is-invalid" : ""}`} 
                 {...rest} 
             />
-            {error && <span className={classError || "text-danger"}>{error}</span>}
         </div>
     );
 };
