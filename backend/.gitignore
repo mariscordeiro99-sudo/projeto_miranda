@@ -1,0 +1,22 @@
+# Segredos e Configurações Locais (NUNCA SUBIR)
+.env
+
+# Ambientes Virtuais
+venv/
+env/
+
+# Python (Arquivos compilados e cache)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# IDEs e Sistema Operacional
+.vscode/
+.idea/
+.DS_Store
