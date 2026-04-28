@@ -1,9 +1,9 @@
 import { Dash } from '../feature/dashboard/components/Dashboard';
 
-export const DashboardPage = () => {
+export const DashboardPage: React.FC = () => {
   return (
-    <div className="page-wrapper"> 
+    <main className="page-wrapper"> 
       <Dash />
-    </div>
+    </main>
   );
 };

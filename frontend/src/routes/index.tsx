@@ -1,20 +1,24 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../feature/auth/hooks/Auth';
+import { DashboardPage } from '../pages/dashboard';
 import { AuthRoutes } from './LoginRoute';
-import { DashRoute } from './dashboardRoute';
 
+interface UserWithRole {
+    role: string;
+  }
 
 export const AppRoutes: React.FC = () => {
   const { loggedUser } = useAuth();
   const isAuthenticated = !!loggedUser;
-  const isAdmin = loggedUser?.role === 'admin';
-
+  const isAdmin = (loggedUser as unknown as UserWithRole)?.role === 'admin';
   return (
     <Routes>
-      {AuthRoutes(isAuthenticated)}
-      {DashRoute(isAdmin)}
-      
+      <Route 
+        path="/login" 
+        element={!isAuthenticated ? <AuthRoutes isAuthenticated={isAuthenticated} /> : <Navigate to="/home" />} 
+      />
+
       <Route 
         path="/home" 
         element={
@@ -23,7 +27,7 @@ export const AppRoutes: React.FC = () => {
               <h1>Logado com sucesso!</h1>
             </div>
           ) : (
-            <Navigate to="/login" />
+            <Navigate to="/login" replace />
           )
         } 
       />
@@ -32,16 +36,17 @@ export const AppRoutes: React.FC = () => {
         path="/dashboard"
         element={
           isAdmin ? (
-            <Navigate to="/dashboard" />
+            <DashboardPage /> 
           ) : (
-            <div className="page-wrapper">
-              <h1>Bem Vindo</h1>
-            </div>
+            <Navigate to="/home" replace /> 
           )
         }
       />
 
-      <Route path="*" element={<Navigate to={isAuthenticated ? "/home" : "/login"} />} />
+      <Route 
+        path="*" 
+        element={<Navigate to={isAuthenticated ? "/home" : "/login"} replace />} 
+      />
     </Routes>
   );
 };

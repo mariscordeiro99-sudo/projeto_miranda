@@ -2,38 +2,32 @@ import React from "react";
 import { Card } from "./Card";
 import { Button } from "./Button";
 
+const NAV_ITEMS = [
+    "Conversas",
+    "Comunicados",
+    "Documentos",
+    "Acessos"
+];
 
 export const NavBar: React.FC = () => {
     return (
-        <div className="navbar">
+        <nav className="navbar">
             <Card
                 classCard="navCard"
                 classCardContent="navContent"
                 contentCard={
                     <div className="navPages">
-                        <Button
-                            contentBtn="Conversas"
-                            classSpan="navSpan"
-                            classBtn="navBtn"
-                        />
-                        <Button
-                            contentBtn="Comunicados"
-                            classSpan="navSpan"
-                            classBtn="navBtn"
-                        />
-                        <Button
-                            contentBtn="Documentos"
-                            classSpan="navSpan"
-                            classBtn="navBtn"
-                        />
-                        <Button
-                            contentBtn="Acessos"
-                            classSpan="navSpan"
-                            classBtn="navBtn"
-                        />
+                        {NAV_ITEMS.map((item) => (
+                            <Button
+                                key={item}
+                                contentBtn={item}
+                                classSpan="navSpan"
+                                classBtn="navBtn"
+                            />
+                        ))}
                     </div>
                 }
             />
-        </div>
+        </nav>
     );
 };

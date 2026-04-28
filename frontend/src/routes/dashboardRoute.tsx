@@ -1,14 +1,21 @@
-import { Route } from 'react-router-dom';
-import { DashPage } from '../pages/dashboard';
-import { Navigate } from 'react-router-dom';
+import { Route, Navigate } from 'react-router-dom';
+import { DashboardPage } from '../pages/dashboard';
 
-export const DashRoutes = (isAdmin: boolean) => {
+interface DashRoutesProps {
+  isAdmin: boolean;
+}
+
+export const DashRoutes = ({ isAdmin }: DashRoutesProps) => {
   return (
-    <>
-      <Route 
-        path="/dashboard" 
-        element={!isAdmin ? <DashPage /> : <Navigate to="/home" />} 
-      />
-    </>
+    <Route 
+      path="/dashboard" 
+      element={
+        isAdmin ? (
+          <DashboardPage />
+        ) : (
+          <Navigate to="/home" replace />
+        )
+      } 
+    />
   );
 };
