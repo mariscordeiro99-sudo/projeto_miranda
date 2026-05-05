@@ -1,6 +1,7 @@
 asgiref==3.11.1
 attrs==26.1.0
 Django==6.0.4
+django-cors-headers==4.9.0
 djangorestframework==3.17.1
 drf-spectacular==0.29.0
 inflection==0.5.1
@@ -14,4 +15,3 @@ rpds-py==0.30.0
 sqlparse==0.5.5
 typing_extensions==4.15.0
 uritemplate==4.2.0
-django-cors-headers==4.0.0
