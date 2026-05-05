@@ -1,83 +1,68 @@
-import React from "react";
-import { Card } from "../../../common/components/Card";
-import { Input } from "../../../common/components/Input";
-import { Button } from "../../../common/components/Button";
-import { useAuth } from "../hooks/Auth";
-import { useLoginBtn } from "../hooks/LoginBtn";
-import "../styles/login.css";
+import React from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { authService } from '../services/auth';
+import './LoginPage.css';
 
-export const Login: React.FC = () => {
-    const { user, 
-            handleUserChange, 
-            userError, 
-            password, 
-            handlePasswordChange, 
-            passwordError
-        } = useAuth();
+const LoginPage: React.FC = () => {
+  const { 
+    password, 
+    setPassword, 
+    loginId, 
+    handleLoginIdChange 
+  } = useAuth();
 
-        const { isLoading, handleLoginSubmit } = useLoginBtn({
-        user,
-        password,
-        hasErrors: !!userError || !!passwordError
-    });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await authService.login({ identificador: loginId, senha: password });
+      console.log('Sucesso:', response.data);
+    } catch (error) {
+      console.error('Erro ao entrar:', error);
+    }
+  };
 
-    const getUserStatusClass = () => {
-        if (!user) return "";
-        return userError ? "input-error" : "input-success";
-    };
+  return (
+    <div className="auth-container">
+      <div className="auth-card">
+        <h2 className="auth-title">Bem-vindo</h2>
+        
+        <form className="auth-form" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>E-mail ou Telefone</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              value={loginId}
+              onChange={handleLoginIdChange}
+              placeholder="seu@dominio.com ou (00) 00000-0000"
+              required
+            />
+          </div>
 
-    const getPasswordStatusClass = () => {
-        if (!password) return "";
-        return passwordError ? "input-error" : "input-success";
-    };
+          <div className="form-group">
+            <label>Senha</label>
+            <input 
+              type="password" 
+              className="form-input" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
 
-    return (
-        <Card
-            title="Login"
-            classCard="card"
-            classCardHeader="card-header"
-            classTitle="card-title"
-            classCardContent="card-content"
-            contentCard={
-                <form className="login-form" onSubmit={handleLoginSubmit}>
-                    <div className="input-group">
-                        <Input
-                            label="Usuário"
-                            value={user}
-                            onChange={handleUserChange}
-                            error={userError}
-                            classLabel="login-label"
-                            classInput={`login-input ${getUserStatusClass()}`}
-                        />
-                        {userError && <span className="tooltip-error">{userError}</span>}
-                    </div>
-                    <div className="input-group">
-                        <Input
-                            label="Senha"
-                            value={password}
-                            onChange={handlePasswordChange}
-                            error={passwordError}
-                            classLabel="login-label"
-                            classInput={`login-input ${getPasswordStatusClass()}`}
-                            type="password"
-                        />
-                        {passwordError && <span className="tooltip-error">{passwordError}</span>}
-                    </div>
+          <button type="submit" className="btn-submit">
+            Acessar Sistema
+          </button>
+        </form>
 
-                    <div className="otherPage">
-                        <p className="remember">Esqueceu a Senha?</p>
-                        <p className="register">Cadastre-se Aqui</p>
-
-                    </div>
-                    <Button
-                        isLoading={isLoading}
-                        contentBtn={isLoading ? "Entrando..." : "Entrar"}
-                        classSpan="login-btn-span"
-                        classBtn="login-btn"
-                        disabled={isLoading || !!userError || !!passwordError || !user}
-                    />
-                </form>
-            }
-        />
-    );
+        <div className="auth-footer">
+          <button className="btn-link">Esqueceu sua senha?</button>
+          <div className="divider"></div>
+          <button className="btn-switch">Criar nova conta</button>
+        </div>
+      </div>
+    </div>
+  );
 };
+
+export default LoginPage;
