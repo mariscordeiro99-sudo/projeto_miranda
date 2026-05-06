@@ -1,9 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { authService } from '../services/auth';
-import './LoginPage.css';
+import { AppRoutes } from '../../../routes/types/loginReg';
+import '../styles/login.css';
 
-const LoginPage: React.FC = () => {
+const Login: React.FC = () => {
+  const navigate = useNavigate();
   const { 
     password, 
     setPassword, 
@@ -51,13 +54,19 @@ const LoginPage: React.FC = () => {
           </div>
 
           <button type="submit" className="btn-submit">
-            Acessar Sistema
+            Entrar
           </button>
         </form>
 
         <div className="auth-footer">
           <button className="btn-link">Esqueceu sua senha?</button>
           <div className="divider"></div>
+          <button 
+            className="btn-switch" 
+            onClick={() => navigate(AppRoutes.REGISTER)}
+          >
+            Criar nova conta
+          </button>
           <button className="btn-switch">Criar nova conta</button>
         </div>
       </div>
@@ -65,4 +74,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default LoginPage;
+export default Login;

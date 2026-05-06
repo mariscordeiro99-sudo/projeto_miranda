@@ -1,5 +1,5 @@
 import React from 'react';
-import './Register.css';
+import '../style/Register.css';
 import { useRegister } from '../hook/useRegister';
 
 const Register: React.FC = () => {

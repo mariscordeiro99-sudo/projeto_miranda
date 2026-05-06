@@ -1,0 +1,55 @@
+.splash-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #ffffff;
+  font-family: 'Open Sans', sans-serif;
+}
+
+.splash-logo-wrapper {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.splash-logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  animation: rotate-logo 3s linear infinite;
+}
+
+.splash-loader-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 4px solid transparent;
+  border-top: 4px solid #4169E1;
+  border-right: 4px solid #7f00ff;
+  border-radius: 50%;
+  animation: rotate-logo 1.5s linear infinite reverse;
+}
+
+@keyframes rotate-logo {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.splash-text {
+  color: #000000;
+  font-weight: bold;
+  font-size: 20px;
+  margin-top: 10px;
+}
+
+.splash-timer {
+  color: #7f00ff;
+  font-size: 14px;
+  margin-top: 5px;
+}

@@ -1,52 +1,37 @@
-import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '../feature/auth/hooks/Auth';
-import { DashboardPage } from '../pages/dashboard';
-import { AuthRoutes } from './LoginRoute';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {SplashPage} from '../pages/splash';
+import {LoginPage} from '../pages/login';
+import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
+import { AppRoutes } from '../routes/types/loginReg';
+import { RegisterPage } from '../pages/register';
 
-interface UserWithRole {
-    role: string;
-  }
+export const AppRouter: React.FC = () => {
+  const { shouldRequireLogin, saveExitTime } = useSessionGuard();
 
-export const AppRoutes: React.FC = () => {
-  const { loggedUser } = useAuth();
-  const isAuthenticated = !!loggedUser;
-  const isAdmin = (loggedUser as unknown as UserWithRole)?.role === 'admin';
+  useEffect(() => {
+    const handleUnload = () => saveExitTime();
+    window.addEventListener('beforeunload', handleUnload);
+    
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, []);
+
   return (
-    <Routes>
-      <Route 
-        path="/login" 
-        element={!isAuthenticated ? <AuthRoutes isAuthenticated={isAuthenticated} /> : <Navigate to="/home" />} 
-      />
+    <BrowserRouter>
+      <Routes>
+        <Route path={AppRoutes.SPLASH} element={<SplashPage />} />
 
-      <Route 
-        path="/home" 
-        element={
-          isAuthenticated ? (
-            <div className="page-wrapper">
-              <h1>Logado com sucesso!</h1>
-            </div>
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        } 
-      />
+        <Route 
+          path={AppRoutes.LOGIN} 
+          element={shouldRequireLogin() ? <LoginPage /> : <Navigate to={AppRoutes.DASHBOARD} />} 
+        />
 
-      <Route
-        path="/dashboard"
-        element={
-          isAdmin ? (
-            <DashboardPage /> 
-          ) : (
-            <Navigate to="/home" replace /> 
-          )
-        }
-      />
+        <Route 
+          path={AppRoutes.REGISTER} 
+          element={<RegisterPage />} 
+        />
 
-      <Route 
-        path="*" 
-        element={<Navigate to={isAuthenticated ? "/home" : "/login"} replace />} 
-      />
-    </Routes>
+      </Routes>
+    </BrowserRouter>
   );
 };
