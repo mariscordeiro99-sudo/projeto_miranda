@@ -86,7 +86,7 @@ const Register: React.FC = () => {
                                     <span className="photo-plus">+</span>
                                 )}
                             </div>
-                            <span>Foto de Perfil</span>
+                            <span className="photo-label-text">Foto de Perfil</span>
                         </label>
                         <input
                             id="photo-input"

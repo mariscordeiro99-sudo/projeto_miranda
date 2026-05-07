@@ -1,11 +1,8 @@
-/* RegisterPage.css */
-
 .register-screen {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: #ffffff; /* Fundo predominante branco */
     padding: 20px;
 }
 
@@ -17,7 +14,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: auto; /* Deixa o card expandir conforme as linhas */
+    max-width: 400px;
+    width: auto;
 }
 
 .register-title {
@@ -25,6 +23,7 @@
     font-weight: 800;
     margin-bottom: 30px;
     background: linear-gradient(90deg, #4169E1 0%, #7f00ff 100%);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -36,7 +35,6 @@
     align-items: center;
 }
 
-/* Alinhamento das Linhas Duplas */
 .form-row {
     display: flex;
     gap: 20px;
@@ -47,18 +45,20 @@
 .form-group {
     display: flex;
     flex-direction: column;
-    width: 350px; /* ✅ Rigorosamente 350px */
-}
+    max-width: 350px;
+    width: 100%;
+  }
 
 .form-group label {
     font-size: 14px;
     font-weight: 600;
-    color: #000000; /* Texto em preto */
+    color: #4169E1;
     margin-bottom: 8px;
 }
 
 .form-input {
-    width: 350px; /* ✅ Rigorosamente 350px */
+    max-width: 350px;
+    width: 100%;
     height: 48px;
     border: 2px solid #e2e8f0;
     border-radius: 10px;
@@ -73,7 +73,6 @@
     border-color: #4169E1;
 }
 
-/* Estilo da Foto de Perfil */
 .form-group-photo {
     margin-bottom: 20px;
 }
@@ -98,6 +97,17 @@
     background: #f8fafc;
 }
 
+.photo-circle:hover {
+    border-color: #7f00ff;
+}
+
+.photo-label-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #4169E1;
+    margin-bottom: 8px;
+}
+
 .photo-circle img {
     width: 100%;
     height: 100%;
@@ -109,25 +119,66 @@
     color: #4169E1;
 }
 
-/* Password Hints */
+.photo-plus:hover {
+    color: #7f00ff;
+}
+
 .password-hints {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
-    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    width: 350px; 
+    justify-content: flex-start;
 }
 
 .password-hints span {
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 1px solid transparent;
 }
 
-.valid { color: #10b981; }
-.invalid { color: #ef4444; }
+.password-hints span.invalid {
+    background-color: #fff1f2;
+    color: #ef4444;
+    border-color: #fee2e2;
+}
 
-/* Botão com Gradiente */
+.password-hints span.valid {
+    background-color: #ecfdf5;
+    color: #10b981;
+    border-color: #d1fae5;
+    transform: scale(1.05);
+    box-shadow: 0 2px 5px rgba(16, 185, 129, 0.1);
+}
+
+.password-hints span::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    transition: background-color 0.3s ease;
+}
+
+.password-hints span.invalid::before {
+    background-color: #ef4444;
+}
+
+.password-hints span.valid::before {
+    background-color: #10b981;
+}
+
 .btn-register-submit {
-    width: 350px; /* ✅ Alinhado com os inputs */
+    max-width: 350px;
+    width: 100%;
     height: 55px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
     background: linear-gradient(90deg, #4169E1 0%, #7f00ff 100%);
     color: white;
     border: none;
