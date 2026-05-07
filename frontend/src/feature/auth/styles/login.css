@@ -16,7 +16,10 @@ body {
 
 .auth-card {
     background: #ffffff;
-    width: 400px;
+    max-width: 400px;
+    max-height: 500px;
+    height: auto;
+    width: 100vh;
     padding: 40px 20px;
     border-radius: 30px;
     border: 1px solid #e0e0e0;
@@ -28,10 +31,23 @@ body {
 
 .auth-title {
     text-align: center;
-    color: #000000;
-    font-size: 32px;
-    margin-bottom: 30px;
+    font-size: 38.9px;
+    font-family: 'Open Sans', sans-serif;
     font-weight: bold;
+    margin-bottom: 30px;
+    background: linear-gradient(90deg, #4169E1 0%, #7f00ff 100%);
+    -webkit-background-clip: text; 
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    display: block;
+    width: 100%;
+}
+
+.auth-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .form-group {
@@ -39,20 +55,25 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     margin-bottom: 20px;
 }
 
 .form-group label {
+    width: 100%;
+    max-width: 350px;
     align-self: flex-start;
     color: #000000;
     font-weight: bold;
     font-size: 14px;
-    margin-left: 45px;
+    margin-left: 25px;
     margin-bottom: 8px;
+    text-align: left;
 }
 
 .form-input {
-    width: 300px;
+    width: 100%;
+    max-width: 350px;
     height: 45px;
     padding: 0 15px;
     border-radius: 12px;
@@ -69,7 +90,8 @@ body {
 }
 
 .btn-submit {
-    width: 300px;
+    width: 100%;
+    max-width: 350px;
     height: 50px;
     margin-top: 10px;
     border-radius: 12px;
@@ -97,7 +119,7 @@ body {
 .auth-footer {
     margin-top: 25px;
     display: flex;
-    flex-direction: column;
+    flex-direction: inline;
     gap: 10px;
     align-items: center;
 }
@@ -105,17 +127,17 @@ body {
 .btn-link, .btn-switch {
     background: none;
     border: none;
-    color: #000000;
+    color: #4169E1;
     font-size: 14px;
     cursor: pointer;
-    text-decoration: underline;
-}
-
-.btn-switch {
     font-weight: bold;
     text-decoration: none;
-    color: #4169E1;
 }
+
+.btn-link:hover, .btn-switch:hover {
+    color: #7f00ff;
+}
+
 
 .tooltip-error {
     background-color: #ff4d4d;

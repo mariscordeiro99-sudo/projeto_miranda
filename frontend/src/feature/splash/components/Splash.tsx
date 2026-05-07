@@ -1,9 +1,9 @@
 import React from 'react';
 import { useSplash } from '../hooks/useSplash';
 import '../style/splash.css';
+import logoImg from '../../../assets/images/logo.png';
 
-// Você pode substituir por um arquivo local importando: import logoImg from '../assets/logo.png'
-const LOGO_PLACEHOLDER = "https://cdn-icons-png.flaticon.com/512/5968/5968282.png"; 
+const LOGO_PLACEHOLDER = logoImg; 
 
 const SplashPage: React.FC = () => {
   const { seconds } = useSplash();

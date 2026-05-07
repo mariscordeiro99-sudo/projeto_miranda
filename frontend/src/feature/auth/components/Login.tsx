@@ -53,12 +53,7 @@ const Login: React.FC = () => {
             />
           </div>
 
-          <button type="submit" className="btn-submit">
-            Entrar
-          </button>
-        </form>
-
-        <div className="auth-footer">
+          <div className="auth-footer">
           <button className="btn-link">Esqueceu sua senha?</button>
           <div className="divider"></div>
           <button 
@@ -67,8 +62,12 @@ const Login: React.FC = () => {
           >
             Criar nova conta
           </button>
-          <button className="btn-switch">Criar nova conta</button>
         </div>
+
+          <button type="submit" className="btn-submit">
+            Entrar
+          </button>
+        </form>
       </div>
     </div>
   );
