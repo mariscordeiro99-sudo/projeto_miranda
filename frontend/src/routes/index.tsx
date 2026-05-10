@@ -1,14 +1,31 @@
+<<<<<<< HEAD
 import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../feature/auth/hooks/Auth';
 import { DashboardPage } from '../pages/dashboard';
 import { AuthRoutes } from './LoginRoute';
 import { api } from '../common/services/api';
+=======
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import {SplashPage} from '../pages/splash';
+import {LoginPage} from '../pages/login';
+import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
+import { AppRoutes } from '../routes/types/loginReg';
+import { RegisterPage } from '../pages/register';
+>>>>>>> 7fb4cf0231632375067a315a78aced8991f9504c
 
-interface UserWithRole {
-    role: string;
-  }
+export const AppRouter: React.FC = () => {
+  const { shouldRequireLogin, saveExitTime } = useSessionGuard();
 
+  useEffect(() => {
+    const handleUnload = () => saveExitTime();
+    window.addEventListener('beforeunload', handleUnload);
+    
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, []);
+
+<<<<<<< HEAD
 export const AppRoutes: React.FC = () => {
   const { loggedUser } = useAuth();
   const [apiMessage, setApiMessage] = useState<string>("");
@@ -29,13 +46,14 @@ export const AppRoutes: React.FC = () => {
       });
   }, [isAuthenticated]);
 
+=======
+>>>>>>> 7fb4cf0231632375067a315a78aced8991f9504c
   return (
-    <Routes>
-      <Route 
-        path="/login" 
-        element={!isAuthenticated ? <AuthRoutes isAuthenticated={isAuthenticated} /> : <Navigate to="/home" />} 
-      />
+    <BrowserRouter>
+      <Routes>
+        <Route path={AppRoutes.SPLASH} element={<SplashPage />} />
 
+<<<<<<< HEAD
       <Route 
         path="/home" 
         element={
@@ -53,22 +71,19 @@ export const AppRoutes: React.FC = () => {
           )
         } 
       />
+=======
+        <Route 
+          path={AppRoutes.LOGIN} 
+          element={shouldRequireLogin() ? <LoginPage /> : <Navigate to={AppRoutes.DASHBOARD} />} 
+        />
+>>>>>>> 7fb4cf0231632375067a315a78aced8991f9504c
 
-      <Route
-        path="/dashboard"
-        element={
-          isAdmin ? (
-            <DashboardPage /> 
-          ) : (
-            <Navigate to="/home" replace /> 
-          )
-        }
-      />
+        <Route 
+          path={AppRoutes.REGISTER} 
+          element={<RegisterPage />} 
+        />
 
-      <Route 
-        path="*" 
-        element={<Navigate to={isAuthenticated ? "/home" : "/login"} replace />} 
-      />
-    </Routes>
+      </Routes>
+    </BrowserRouter>
   );
 };

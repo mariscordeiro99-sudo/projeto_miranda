@@ -1,9 +1,13 @@
 import React from 'react';
-import { AppRoutes } from './routes';
+import { AppRouter } from './routes/index';
 import './common/styles/global.css';
 
 const App: React.FC = () => {
-  return <AppRoutes />;
+  return (
+    <div className="app-wrapper">
+      <AppRouter />
+    </div>
+  )
 };
 
 export default App;
