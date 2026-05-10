@@ -1,11 +1,3 @@
-<<<<<<< HEAD
-import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '../feature/auth/hooks/Auth';
-import { DashboardPage } from '../pages/dashboard';
-import { AuthRoutes } from './LoginRoute';
-import { api } from '../common/services/api';
-=======
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import {SplashPage} from '../pages/splash';
@@ -13,7 +5,6 @@ import {LoginPage} from '../pages/login';
 import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
 import { AppRoutes } from '../routes/types/loginReg';
 import { RegisterPage } from '../pages/register';
->>>>>>> 7fb4cf0231632375067a315a78aced8991f9504c
 
 export const AppRouter: React.FC = () => {
   const { shouldRequireLogin, saveExitTime } = useSessionGuard();
