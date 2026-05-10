@@ -1,7 +1,7 @@
 import React from "react";
 import { Card } from "../../../common/components/Card";
 import { Input } from "../../../common/components/Input";
-import { Button } from "../../../common/components/Button";
+import { Button } from "../../../common/components/button";
 import { useAuth } from "../hooks/Auth";
 import { useLoginBtn } from "../hooks/LoginBtn";
 import "../styles/login.css";
@@ -15,7 +15,7 @@ export const Login: React.FC = () => {
             passwordError
         } = useAuth();
 
-        const { isLoading, handleLoginSubmit } = useLoginBtn({
+        const { isLoading, error, handleLoginSubmit } = useLoginBtn({
         user,
         password,
         hasErrors: !!userError || !!passwordError
@@ -40,6 +40,7 @@ export const Login: React.FC = () => {
             classCardContent="card-content"
             contentCard={
                 <form className="login-form" onSubmit={handleLoginSubmit}>
+                    {error && <div style={{ color: "red", marginBottom: "10px" }}>{error}</div>}
                     <div className="input-group">
                         <Input
                             label="Usuário"

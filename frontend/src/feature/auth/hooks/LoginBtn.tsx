@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/Auth";
+import api from '../../../common/services/api';
 
 type LoginBtnProps = {
     user: string;
@@ -10,6 +11,7 @@ type LoginBtnProps = {
 
 export const useLoginBtn = ({ user, password, hasErrors }: LoginBtnProps) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string>("");
     const navigate = useNavigate();
     const { setLoggedUser } = useAuth(); 
 
@@ -17,22 +19,31 @@ export const useLoginBtn = ({ user, password, hasErrors }: LoginBtnProps) => {
         e.preventDefault();
 
         if (hasErrors || !user || !password) {
-            console.error("Dados inválidos. Verifique os campos.");
+            setError("Dados inválidos. Verifique os campos.");
             return;
         }
 
         setIsLoading(true);
+        setError("");
 
         try {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            const response = await api.post("/login", {
+                username: user,
+                password: password
+            });
+
+            const { token, user: userData } = response.data;
+            
+            localStorage.setItem("token", token);
             setLoggedUser(user);
 
             console.log("Login efetuado para:", user);
-
             navigate("/home");
 
-        } catch (error) {
-            console.error("Erro ao processar login:", error);
+        } catch (err: any) {
+            const errorMessage = err.response?.data?.detail || "Usuário ou senha inválidos.";
+            setError(errorMessage);
+            console.error("Erro ao fazer login:", err);
         } finally {
             setIsLoading(false);
         }
@@ -40,6 +51,7 @@ export const useLoginBtn = ({ user, password, hasErrors }: LoginBtnProps) => {
 
     return {
         isLoading,
+        error,
         handleLoginSubmit
     };
 };

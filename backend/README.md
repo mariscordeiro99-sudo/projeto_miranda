@@ -21,8 +21,21 @@ python3 -m venv venv
 source venv/bin/activate  # No Linux/Mac
 venv\Scripts\activate     # No Windows
 
-# Instale as dependências
+# Instale as dependências do Django REST
 pip install -r requirements.txt 
+```
+
+### FastAPI alternativo
+Se quiser rodar o backend com FastAPI em vez de Django, instale também:
+
+```bash
+pip install -r requirements-fastapi.txt
+```
+
+E execute:
+
+```bash
+uvicorn fastapi_app:app --reload --host 127.0.0.1 --port 8000
 ```
 
 ## 3.O Cofre de Senhas (.env)
