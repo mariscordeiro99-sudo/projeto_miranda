@@ -1,11 +1,9 @@
-<<<<<<< HEAD
-=======
 import api from '../../../common/services/api';
 import type { LoginFormData } from '../types/loginForm';
->>>>>>> 7fb4cf0231632375067a315a78aced8991f9504c
 
 export const authService = {
   login: async (data: LoginFormData) => {
+    // Se for e-mail, mantém. Se for telefone, remove parênteses e traços.
     const loginValue = data.identificador.includes('@') 
       ? data.identificador 
       : data.identificador.replace(/\D/g, '');
