@@ -1,4 +1,4 @@
 export const SPLASH_CONFIG = {
-  DURATION_MS: 10000, // 10 segundos
+  DURATION_MS: 5000, 
   TICK_INTERVAL_MS: 1000,
 };
