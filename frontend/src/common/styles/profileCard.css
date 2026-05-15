@@ -1,0 +1,149 @@
+.profile-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 2500;
+}
+
+.profile-card {
+    position: fixed;
+    top: 70px; /* Logo abaixo da NavBar */
+    right: 20px;
+    width: 280px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    z-index: 2501;
+    overflow: hidden;
+    animation: slideInDown 0.2s ease-out;
+}
+
+.profile-header {
+    padding: 25px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    background: linear-gradient(180deg, #f8f9ff 0%, #ffffff 100%);
+}
+
+.profile-image-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+
+.profile-img-large, .profile-placeholder-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid white;
+    box-shadow: 0 4px 10px rgba(65, 105, 225, 0.2);
+}
+
+.profile-placeholder-large {
+    background-color: #f0f4ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.change-photo-badge {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(45deg, #4169E1, #7f00ff);
+    color: white;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px solid white;
+    transition: transform 0.2s;
+}
+
+.change-photo-badge:hover {
+    transform: scale(1.1);
+}
+
+.profile-info {
+    text-align: center;
+}
+
+.profile-name {
+    display: block;
+    font-weight: 800;
+    color: #000;
+    font-size: 16px;
+}
+
+.profile-role {
+    font-size: 11px;
+    color: #7f00ff;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.profile-divider {
+    height: 1px;
+    background-color: #f1f5f9;
+}
+
+.profile-actions {
+    padding: 10px;
+}
+
+.profile-action-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 15px;
+    text-decoration: none;
+    color: #444;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.profile-action-item:hover {
+    background-color: #f8fafc;
+    color: #4169E1;
+}
+
+.profile-footer {
+    padding: 10px;
+}
+
+.logout-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 15px;
+    background: none;
+    border: none;
+    color: #ef4444;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.logout-button:hover {
+    background-color: #fef2f2;
+}
+
+@keyframes slideInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
