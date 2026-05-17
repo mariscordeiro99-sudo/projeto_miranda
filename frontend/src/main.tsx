@@ -1,16 +1,15 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import App from './App.tsx'
-import { AuthProvider } from '../src/feature/auth/hooks/AuthProvider';
-import './common/styles/global.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { AppRouter } from './routes';
+import { AuthProvider } from './feature/auth/hooks/AuthProvider'; 
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+// Mantemos esta linha comentada para o Vite não travar no erro do CSS
+// import "./index.css"; 
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
     <AuthProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <AppRouter />
     </AuthProvider>
-  </StrictMode>,
-)
+  </React.StrictMode>
+);
