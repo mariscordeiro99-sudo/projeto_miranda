@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import {SplashPage} from '../pages/splash';
 import {LoginPage} from '../pages/login';
+import { LoginSuccessPage } from '../pages/loginSuccess';
+import { DashboardPage } from '../pages/dashboard';
 import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
 import { AppRoutes } from '../routes/types/loginReg';
 import { RegisterPage } from '../pages/register';
@@ -29,6 +31,16 @@ export const AppRouter: React.FC = () => {
         <Route 
           path={AppRoutes.REGISTER} 
           element={<RegisterPage />} 
+        />
+
+        <Route
+          path={AppRoutes.LOGIN_SUCCESS}
+          element={<LoginSuccessPage />}
+        />
+
+        <Route
+          path={AppRoutes.DASHBOARD}
+          element={<DashboardPage />}
         />
 
       </Routes>

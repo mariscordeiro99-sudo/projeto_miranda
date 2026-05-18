@@ -1,6 +1,6 @@
 import React from "react";
-import { Card } from "../../../common/components/Card";
-import { NavBar } from "../../../common/components/NavBar";
+import Card from "../../../common/components/Card";
+import NavBar from "../../../common/components/NavBar";
 import "../styles/dash.css";
 
 interface DashItem {

@@ -17,9 +17,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from api.views import HelloView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('auth/', include('api.auth_urls')),
+    path('health/', HelloView.as_view(), name='health'),
     # Rota para gerar o arquivo YAML/JSON do schema
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     # Rota da Interface Visual (A que o Tagor vai usar)
