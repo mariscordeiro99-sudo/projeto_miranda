@@ -18,9 +18,13 @@ const Login: React.FC = () => {
     e.preventDefault();
     try {
       const response = await authService.login({ identificador: loginId, senha: password });
+      localStorage.setItem('auth_token', response.data.access_token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
       console.log('Sucesso:', response.data);
-    } catch (error) {
+      navigate(AppRoutes.LOGIN_SUCCESS);
+    } catch (error: any) {
       console.error('Erro ao entrar:', error);
+      alert(error.response?.data?.detail || 'Erro ao efetuar login.');
     }
   };
 
@@ -54,9 +58,10 @@ const Login: React.FC = () => {
           </div>
 
           <div className="auth-footer">
-          <button className="btn-link">Esqueceu sua senha?</button>
+          <button type="button" className="btn-link">Esqueceu sua senha?</button>
           <div className="divider"></div>
           <button 
+            type="button"
             className="btn-switch" 
             onClick={() => navigate(AppRoutes.REGISTER)}
           >

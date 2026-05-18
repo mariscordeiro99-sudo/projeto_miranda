@@ -1,7 +1,8 @@
 import React from "react";
 import NavBar from "../../../common/components/NavBar";
+import "../styles/dash.css";
 
-const Dashboard: React.FC = () => {
+export const Dash: React.FC = () => {
     return (
         <header>
             <NavBar>
@@ -10,4 +11,4 @@ const Dashboard: React.FC = () => {
     );
 };
 
-export default Dashboard;
+export default Dash;

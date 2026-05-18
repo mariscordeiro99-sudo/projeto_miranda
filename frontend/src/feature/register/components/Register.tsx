@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AppRoutes } from '../../../routes/types/loginReg';
 import { useRegister } from '../hooks/useRegister';
 import { useProfileImage } from '../hooks/useProfileImage';
+import { registerUser } from '../services/registerApi';
 import type { RegisterFormData } from '../types/registerForm';
 import '../style/Register.css';
 
 const Register: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
+    const navigate = useNavigate();
 
     const {
         password, setPassword, rules, isPasswordValid,
@@ -48,23 +52,17 @@ const Register: React.FC = () => {
         };
 
         try {
-            const data = new FormData();
-            data.append('nome', completeData.nome);
-            data.append('email', completeData.email);
-            data.append('usuario', completeData.usuario);
-            data.append('telefone', completeData.telefone);
-            data.append('senha', completeData.senha);
-            data.append('isGestor', String(completeData.isGestor));
-
-            if (completeData.fotoPerfil) {
-                data.append('fotoPerfil', completeData.fotoPerfil);
+            await registerUser(completeData);
+            alert('Cadastro realizado com sucesso! Você será redirecionado para o login.');
+            navigate(AppRoutes.LOGIN);
+            return;
+        } catch (error: any) {
+            console.error('Erro ao cadastrar usuário:', error);
+            if (error.response?.data?.detail) {
+                alert(`Erro: ${error.response.data.detail}`);
+            } else {
+                alert('Erro ao cadastrar. Verifique os dados e tente novamente.');
             }
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            alert('Cadastro realizado com sucesso!');
-
-        } catch (error) {
-            console.error('Erro:', error);
         } finally {
             setIsLoading(false);
         }
