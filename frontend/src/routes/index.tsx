@@ -1,83 +1,107 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { SplashPage } from '../pages/splash';
-import { LoginPage } from '../pages/login';
-import { RegisterPage } from '../pages/register';
+import {SplashPage} from '../pages/splash';
+import {LoginPage} from '../pages/login';
 import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
-import { AppRoutes as RoutePaths } from '../routes/types/loginReg';
-import { useAuth } from '../feature/auth/hooks/Auth'; // Ajuste o caminho se necessário
-import { api } from '../common/services/api'; // Caminho da sua conexão com o backend
+import { AppRoutes } from '../routes/types/loginReg';
+import { RegisterPage } from '../pages/register';
+import { DashboardPage } from '../pages/dashboard';
 
-// Definição de tipo para o usuário (ajuste conforme seu projeto)
-interface UserWithRole {
-  role: string;
-}
+const LogoutRoute: React.FC = () => {
+  useEffect(() => {
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('user_data');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('user_data');
+  }, []);
+
+  return <Navigate to={AppRoutes.LOGIN} replace />;
+};
+
+const clearAuthSession = () => {
+  sessionStorage.removeItem('auth_token');
+  sessionStorage.removeItem('token');
+  sessionStorage.removeItem('user');
+  sessionStorage.removeItem('user_data');
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('user_data');
+};
 
 export const AppRouter: React.FC = () => {
-  const { shouldRequireLogin, saveExitTime } = useSessionGuard();
-  const { loggedUser } = useAuth();
-  const [apiMessage, setApiMessage] = useState<string>("");
-  const [apiError, setApiError] = useState<string>("");
+  const { saveExitTime } = useSessionGuard();
+  const [, setAuthTick] = useState(0);
+  const [ready, setReady] = useState(() => {
+    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    if (navigation?.type === 'reload') {
+      clearAuthSession();
+    }
 
-  const isAuthenticated = !!loggedUser;
+    return true;
+  });
 
-  // Gerencia o tempo de saída (Sessão)
+  const isAuthenticated = () => {
+    return Boolean(
+      sessionStorage.getItem('auth_token') || sessionStorage.getItem('token')
+    );
+  };
+
   useEffect(() => {
     const handleUnload = () => saveExitTime();
+    const handleAuthChanged = () => setAuthTick((value) => value + 1);
+
+    setReady(true);
     window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
-  }, [saveExitTime]);
+    window.addEventListener('auth-changed', handleAuthChanged);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('auth-changed', handleAuthChanged);
+    };
+  }, []);
 
-  // Testa a comunicação com o seu Backend FastAPI
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    api.get('/hello')
-      .then((response) => {
-        setApiMessage(response.data.message || 'Comunicação estabelecida.');
-      })
-      .catch((error) => {
-        console.error('Erro ao chamar backend FastAPI:', error);
-        setApiError('Não foi possível conectar ao backend.');
-      });
-  }, [isAuthenticated]);
+  if (!ready) return null;
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rota da Splash Screen do Tagor */}
-        <Route path={RoutePaths.SPLASH} element={<SplashPage />} />
+        <Route path={AppRoutes.SPLASH} element={<SplashPage />} />
 
-        {/* Rota de Login com a lógica de sessão */}
         <Route 
-          path={RoutePaths.LOGIN} 
-          element={shouldRequireLogin() ? <LoginPage /> : <Navigate to="/home" />} 
+          path={AppRoutes.LOGIN} 
+          element={<LoginPage />} 
         />
 
-        {/* Rota de Cadastro */}
-        <Route path={RoutePaths.REGISTER} element={<RegisterPage />} />
-
-        {/* Home / Dashboard com integração do Backend */}
         <Route 
-          path="/home" 
-          element={
-            isAuthenticated ? (
-              <div className="page-wrapper">
-                <h1>Logado com sucesso!</h1>
-                <div>
-                  <h2>Status do Backend FastAPI</h2>
-                  {apiMessage && <p style={{ color: 'green' }}>{apiMessage}</p>}
-                  {apiError && <p style={{ color: 'red' }}>{apiError}</p>}
-                </div>
-              </div>
-            ) : (
-              <Navigate to={RoutePaths.LOGIN} replace />
-            )
-          } 
+          path={AppRoutes.REGISTER} 
+          element={<RegisterPage />} 
         />
 
-        {/* Redirecionamento padrão caso a rota não exista */}
-        <Route path="*" element={<Navigate to={RoutePaths.SPLASH} replace />} />
+        <Route
+          path={AppRoutes.DASHBOARD}
+          element={isAuthenticated() ? <DashboardPage /> : <Navigate to={AppRoutes.LOGIN} replace />}
+        />
+
+        <Route
+          path="/home"
+          element={isAuthenticated() ? <Navigate to={AppRoutes.DASHBOARD} replace /> : <Navigate to={AppRoutes.LOGIN} replace />}
+        />
+
+        <Route
+          path="/logout"
+          element={<LogoutRoute />}
+        />
+
+        <Route
+          path="*"
+          element={<Navigate to={AppRoutes.SPLASH} replace />}
+        />
+
       </Routes>
     </BrowserRouter>
   );
