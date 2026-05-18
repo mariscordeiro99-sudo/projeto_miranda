@@ -1,20 +1,41 @@
 import React from 'react';
 import { Menu, User, Image as ImageIcon } from 'lucide-react';
 import { useNavBar } from '../hooks/useNavBar';
+import ProfileCard from '../components/ProfileCard';
+import SideMenu from '../components/SideBar';
 import '../styles/navBar.css';
 
 const NavBar: React.FC = () => {
-  const { userData, toggleMenu, toggleProfile } = useNavBar();
+  const {
+    userData,
+    toggleMenu,
+    toggleProfile,
+    isProfileCardOpen,
+    isMenuOpen,
+    handleLogout
+  } = useNavBar();
+
+  const permissions = {
+    painelGestor: false,
+    controleAcessos: false,
+    editorComunicados: false,
+    comunicados: true,
+    conversas: true,
+    configIdentidade: false
+  };
 
   if (!userData) return null;
 
   return (
     <nav className="navbar-fixed">
+      {/* SEÇÃO ESQUERDA */}
       <div className="nav-section nav-left">
         <button className="nav-icon-btn" onClick={toggleMenu}>
           <Menu size={26} />
         </button>
+        
         <div className="nav-divider"></div>
+        
         <div className="nav-brasao-container">
           {userData.brasao ? (
             <img src={userData.brasao} alt="Brasão" className="nav-brasao-img" />
@@ -26,10 +47,12 @@ const NavBar: React.FC = () => {
         </div>
       </div>
 
+      {/* SEÇÃO CENTRAL */}
       <div className="nav-section nav-center">
         <h1 className="nav-app-title">SISTEMA GESTOR</h1>
       </div>
 
+      {/* SEÇÃO DIREITA */}
       <div className="nav-section nav-right" onClick={toggleProfile}>
         <span className="nav-username">{userData.nome}</span>
         <div className="nav-profile-circle">
@@ -40,6 +63,22 @@ const NavBar: React.FC = () => {
           )}
         </div>
       </div>
+    
+      <SideMenu
+        isOpen={isMenuOpen}
+        onClose={toggleMenu}
+        userRole={userData.role?.toLowerCase() as 'gestor' | 'colaborador'}
+        permissions={permissions}
+      />
+
+      <ProfileCard
+        isOpen={isProfileCardOpen}
+        onClose={toggleProfile}
+        userName={userData.nome}
+        userPhoto={userData.foto}
+        userRole={userData.role || 'Colaborador'}
+        onLogout={handleLogout}
+      />
     </nav>
   );
 };

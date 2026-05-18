@@ -3,48 +3,58 @@ import { useNavigate } from 'react-router-dom';
 import { AppRoutes } from '../../routes/types/loginReg';
 
 export const useNavBar = () => {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
-    const [userData] = useState(() => {
-        const storedUser = localStorage.getItem('user_data');
-        if (storedUser) {
-            try {
-                return JSON.parse(storedUser);
-            } catch { return null; }
-        }
-        return null;
-    });
-
-    const [brasaoUrl, setBrasaoUrl] = useState<string | null>(null);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [isProfileCardOpen, setIsProfileCardOpen] = useState(false);
-
-    useEffect(() => {
-        if (!userData) {
-            navigate(AppRoutes.LOGIN);
-            return;
-        }
-
-        // Simulação de busca do Brasão de outra tabela do banco
-        // Aqui no futuro vamos colocar o fetch('/api/configuracao-instituicao/')
-        const fetchInstituicao = async () => {
-            try {
-                const storedBrasao = localStorage.getItem('instituicao_brasao');
-                setBrasaoUrl(storedBrasao);
-            } catch {
-                setBrasaoUrl(null);
-            }
+  const [userData] = useState(() => {
+    const storedUser = localStorage.getItem('user_data');
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        return {
+          nome: parsed.nome,
+          foto: parsed.fotoPerfil || parsed.foto, // Fallback para nomes de chaves diferentes
+          brasao: parsed.brasaoUrl || parsed.brasao,
+          role: parsed.role || 'Colaborador'
         };
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
 
-        fetchInstituicao();
-    }, [userData, navigate]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileCardOpen, setIsProfileCardOpen] = useState(false);
 
-    return {
-        userData,
-        brasaoUrl,
-        isMenuOpen,
-        isProfileCardOpen,
-        toggleMenu: () => setIsMenuOpen(!isMenuOpen),
-        toggleProfile: () => setIsProfileCardOpen(!isProfileCardOpen),
-    };
+  useEffect(() => {
+    if (!userData) {
+      navigate(AppRoutes.LOGIN);
+    }
+  }, [userData, navigate]);
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+    if (isProfileCardOpen) setIsProfileCardOpen(false); // Fecha o card se abrir o menu
+  };
+
+  const toggleProfile = () => {
+    setIsProfileCardOpen(!isProfileCardOpen);
+    if (isMenuOpen) setIsMenuOpen(false); // Fecha o menu se abrir o card
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    localStorage.removeItem('instituicao_brasao');
+    navigate(AppRoutes.LOGIN);
+  };
+
+  return {
+    userData,
+    isMenuOpen,
+    isProfileCardOpen,
+    toggleMenu,
+    toggleProfile,
+    handleLogout,
+  };
 };
