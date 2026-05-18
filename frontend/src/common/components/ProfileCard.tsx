@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { User, Settings, LogOut, Camera } from 'lucide-react';
 import type { ProfileCardProps } from '../types/profileCard';
-import '../style/profileCard.css';
+import '../styles/profileCard.css';
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
     isOpen,
