@@ -47,3 +47,6 @@ __pycache__/
 .vscode/
 .idea/
 .DS_Store
+
+
+backend/env.production
