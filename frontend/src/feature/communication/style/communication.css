@@ -1,0 +1,141 @@
+.comunicados-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.comunicados-container {
+    padding-top: 100px; 
+    padding-bottom: 40px;
+    padding-inline: 24px;
+    max-width: 800px; 
+    width: 100%;
+    margin: 0 auto;
+}
+
+.comunicados-header {
+    margin-bottom: 30px;
+}
+
+.comunicados-header h2 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 800;
+    color: #000000;
+}
+
+.comunicados-header p {
+    margin: 6px 0 0 0;
+    color: #64748b;
+    font-size: 15px;
+}
+
+.comunicados-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.comunicado-card {
+    background-color: #ffffff;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    border: 1px solid #e2e8f0;
+    position: relative;
+    transition: transform 0.2s ease;
+}
+
+.comunicado-card:hover {
+    transform: translateY(-2px);
+}
+
+.comunicado-card.is-fixed {
+    border-left: 4px solid #4169E1; 
+}
+
+.pinned-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #4169E1;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+}
+
+.comunicado-meta {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 14px;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.comunicado-title {
+    margin: 0 0 12px 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #000000;
+    line-height: 1.3;
+}
+
+.comunicado-body {
+    margin: 0;
+    font-size: 15px;
+    color: #334155;
+    line-height: 1.6;
+    white-space: pre-line; 
+}
+
+.comunicado-image-wrapper {
+    margin-top: 20px;
+    border-radius: 12px;
+    overflow: hidden;
+    max-height: 350px;
+    border: 1px solid #f1f5f9;
+}
+
+.comunicado-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+@media (max-width: 600px) {
+    .comunicado-card {
+        padding: 20px;
+    }
+    
+    .comunicado-title {
+        font-size: 18px;
+    }
+}
+.comunicados-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 0;
+    color: #64748b;
+    font-weight: 600;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}

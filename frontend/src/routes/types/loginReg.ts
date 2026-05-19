@@ -3,5 +3,6 @@ export const AppRoutes = {
   LOGIN: '/login',
   REGISTER: '/register',
   LOGIN_SUCCESS: '/login-success',
-  DASHBOARD: '/dashboard'
+  DASHBOARD: '/dashboard',
+  COMUNICADOS: '/comunicados'
 }
