@@ -101,6 +101,7 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Verifica se estamos em produção (usando variáveis individuais do Render + Aiven)
 if os.getenv('DB_HOST'):
     # Configuração para produção com MySQL na Aiven
+    # Aiven exige SSL obrigatório - esta configuração não precisa de certificado local
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
@@ -108,18 +109,14 @@ if os.getenv('DB_HOST'):
             'USER': os.getenv('DB_USER', 'avnadmin'),
             'PASSWORD': os.getenv('DB_PASSWORD'),
             'HOST': os.getenv('DB_HOST'),
-            'PORT': os.getenv('DB_PORT', '3306'),
+            'PORT': int(os.getenv('DB_PORT', '3306')),
             'ATOMIC_REQUESTS': True,
             'CONN_MAX_AGE': 600,
             'OPTIONS': {
                 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
                 'charset': 'utf8mb4',
-                'ssl': {
-                    'ca': None,  # Aiven usa certificados CA padrão da aplicação
-                },
-                'ssl_mode': 'REQUIRED',
-                'ssl_verify_cert': False,  # Aiven free não requer verificação de cert
-                'ssl_verify_identity': False,  # Aiven free não requer verificação de identidade
+                'use_unicode': True,
+                'ssl_mode': 'REQUIRED',  # Força SSL obrigatório sem verificação de certificado
             }
         }
     }
@@ -131,12 +128,13 @@ elif os.getenv('DATABASE_URL'):
             conn_max_age=600
         ),
     }
-    DATABASES['default']['OPTIONS'] = {
-        'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        'ssl_mode': 'REQUIRED',
-        'ssl_verify_cert': False,
-        'ssl_verify_identity': False,
-    }
+    if 'mysql' in os.getenv('DATABASE_URL', ''):
+        DATABASES['default']['OPTIONS'] = {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'charset': 'utf8mb4',
+            'use_unicode': True,
+            'ssl_mode': 'REQUIRED',
+        }
 else:
     # Configuração local (SQLite padrão para desenvolvimento)
     DATABASES = {
