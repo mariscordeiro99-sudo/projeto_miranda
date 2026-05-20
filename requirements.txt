@@ -41,3 +41,4 @@ urllib3==2.7.0
 uvicorn==0.47.0
 zope.event==6.2
 zope.interface==8.4
+dj-database-url==2.1.0
