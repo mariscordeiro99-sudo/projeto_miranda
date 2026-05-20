@@ -119,21 +119,7 @@ def get_ca_cert_path():
 
 # Configuração de Database
 if os.getenv('DB_HOST'):
-    # Configuração para produção com MySQL na Aiven
-    ca_cert = get_ca_cert_path()
-    
-    ssl_config = {
-        'ca': ca_cert,
-        'check_hostname': False,
-    }
-    
-    # Se não há certificado, tenta sem verificação
-    if not ca_cert:
-        ssl_config = {
-            'ca': None,
-            'check_hostname': False,
-        }
-    
+    # Configuração para produção com MySQL na Aiven (usando PyMySQL)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
@@ -149,7 +135,12 @@ if os.getenv('DB_HOST'):
                 'charset': 'utf8mb4',
                 'use_unicode': True,
                 'autocommit': True,
-                'ssl': ssl_config,
+                # PyMySQL com SSL obrigatório
+                'ssl': {
+                    'ca': get_ca_cert_path(),
+                    'check_hostname': False,
+                    'require': True,  # Força SSL obrigatório
+                },
             }
         }
     }
@@ -161,14 +152,17 @@ elif os.getenv('DATABASE_URL'):
             conn_max_age=600
         ),
     }
-    ca_cert = get_ca_cert_path()
-    if ca_cert and 'mysql' in os.getenv('DATABASE_URL', ''):
+    if 'mysql' in os.getenv('DATABASE_URL', ''):
         DATABASES['default']['OPTIONS'] = {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'charset': 'utf8mb4',
             'use_unicode': True,
             'autocommit': True,
-            'ssl': {'ca': ca_cert, 'check_hostname': False},
+            'ssl': {
+                'ca': get_ca_cert_path(),
+                'check_hostname': False,
+                'require': True,
+            },
         }
 else:
     # Configuração local (SQLite padrão para desenvolvimento)
