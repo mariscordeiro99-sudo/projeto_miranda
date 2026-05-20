@@ -98,21 +98,47 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Verifica se estamos em produção pelo Render (verificando a existência da DATABASE_URL)
-if os.getenv('DATABASE_URL'):
+# Verifica se estamos em produção (usando variáveis individuais do Render + Aiven)
+if os.getenv('DB_HOST'):
+    # Configuração para produção com MySQL na Aiven
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('DB_NAME', 'defaultdb'),
+            'USER': os.getenv('DB_USER', 'avnadmin'),
+            'PASSWORD': os.getenv('DB_PASSWORD'),
+            'HOST': os.getenv('DB_HOST'),
+            'PORT': os.getenv('DB_PORT', '3306'),
+            'ATOMIC_REQUESTS': True,
+            'CONN_MAX_AGE': 600,
+            'OPTIONS': {
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                'charset': 'utf8mb4',
+                'ssl': {
+                    'ca': None,  # Aiven usa certificados CA padrão da aplicação
+                },
+                'ssl_mode': 'REQUIRED',
+                'ssl_verify_cert': False,  # Aiven free não requer verificação de cert
+                'ssl_verify_identity': False,  # Aiven free não requer verificação de identidade
+            }
+        }
+    }
+elif os.getenv('DATABASE_URL'):
+    # Fallback para DATABASE_URL se configurada
     DATABASES = {
         'default': dj_database_url.config(
             default=os.environ.get('DATABASE_URL'),
             conn_max_age=600
         ),
     }
-    # Adiciona as configurações obrigatórias exigidas pela Aiven
     DATABASES['default']['OPTIONS'] = {
         'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
         'ssl_mode': 'REQUIRED',
-    }  
+        'ssl_verify_cert': False,
+        'ssl_verify_identity': False,
+    }
 else:
-    # Configuração local (SQLite padrão para não precisar de senha)
+    # Configuração local (SQLite padrão para desenvolvimento)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
