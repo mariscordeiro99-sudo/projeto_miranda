@@ -15,11 +15,22 @@ from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
 import ssl
-# Carrega as variáveis do .env
-load_dotenv('.env.production')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Carrega as variáveis do .env.production (procura no diretório backend)
+# Tenta diferentes nomes de arquivo em ordem de preferência
+env_files = [
+    BASE_DIR / '.env.production',
+    BASE_DIR / 'env.production',  # Sem ponto no início
+    BASE_DIR / '.env',
+]
+
+for env_file in env_files:
+    if env_file.exists():
+        load_dotenv(env_file)
+        break
 
 
 # Quick-start development settings - unsuitable for production
