@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-
+import dj_database_url
 # Carrega as variáveis do .env
 load_dotenv('.env.production')
 
@@ -98,22 +98,19 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Verifica se estamos em produção pelo Render (verificando a existência da variável de host)
-if os.getenv('DB_HOST'):
+# Verifica se estamos em produção pelo Render (verificando a existência da DATABASE_URL)
+if os.getenv('DATABASE_URL'):
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': os.getenv('DB_NAME'),
-            'USER': os.getenv('DB_USER'),
-            'PASSWORD': os.getenv('DB_PASSWORD'),
-            'HOST': os.getenv('DB_HOST'),
-            'PORT': os.getenv('DB_PORT', '3306'),
-            'OPTIONS': {
-                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-                'ssl_mode': 'REQUIRED',
-            },
-        }
+        'default': dj_database_url.config(
+            default=os.environ.get('DATABASE_URL'),
+            conn_max_age=600
+        ),
     }
+    # Adiciona as configurações obrigatórias exigidas pela Aiven
+    DATABASES['default']['OPTIONS'] = {
+        'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        'ssl_mode': 'REQUIRED',
+    }  
 else:
     # Configuração local (SQLite padrão para não precisar de senha)
     DATABASES = {
