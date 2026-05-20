@@ -1,7 +1,21 @@
-django>=4.2,<5.0
-djangorestframework
-dj-database-url==2.1.0
-mysqlclient==2.2.4
-python-dotenv==1.0.1
+# Servidor de Produção
 gunicorn==21.2.0
+
+# Base do Django
+django>=4.2,<5.0
+dj-database-url==2.1.0
+
+# Banco de Dados
+mysqlclient==2.2.4
+psycopg2-binary==2.9.9
+
+# API e Documentação
+djangorestframework
+django-cors-headers
 drf-spectacular
+drf-spectacular-sidecar
+
+# Variáveis de Ambiente e Utilitários
+python-dotenv==1.0.1
+pillow
+requests
