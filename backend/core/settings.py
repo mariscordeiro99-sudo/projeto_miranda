@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
+import ssl
 # Carrega as variáveis do .env
 load_dotenv('.env.production')
 
@@ -98,10 +99,41 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Verifica se estamos em produção (usando variáveis individuais do Render + Aiven)
+# Detecta o caminho do certificado CA da Aiven
+def get_ca_cert_path():
+    """Detecta o caminho do certificado CA disponível no sistema"""
+    possible_paths = [
+        os.getenv('DB_CA_CERT'),  # Variável de ambiente
+        '/opt/render/project/src/certs/ca.pem',  # Render custom
+        '/etc/ssl/certs/ca-certificates.crt',  # Linux
+        '/etc/ssl/certs/ca-bundle.crt',  # Linux
+        '/opt/render/project/src/certs/ca-bundle.crt',  # Render
+        BASE_DIR / 'certs' / 'ca.pem',  # Local do projeto
+    ]
+    
+    for path in possible_paths:
+        if path and os.path.exists(str(path)):
+            return str(path)
+    
+    return None
+
+# Configuração de Database
 if os.getenv('DB_HOST'):
     # Configuração para produção com MySQL na Aiven
-    # Aiven exige SSL obrigatório - esta configuração não precisa de certificado local
+    ca_cert = get_ca_cert_path()
+    
+    ssl_config = {
+        'ca': ca_cert,
+        'check_hostname': False,
+    }
+    
+    # Se não há certificado, tenta sem verificação
+    if not ca_cert:
+        ssl_config = {
+            'ca': None,
+            'check_hostname': False,
+        }
+    
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
@@ -116,7 +148,8 @@ if os.getenv('DB_HOST'):
                 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
                 'charset': 'utf8mb4',
                 'use_unicode': True,
-                'ssl_mode': 'REQUIRED',  # Força SSL obrigatório sem verificação de certificado
+                'autocommit': True,
+                'ssl': ssl_config,
             }
         }
     }
@@ -128,12 +161,14 @@ elif os.getenv('DATABASE_URL'):
             conn_max_age=600
         ),
     }
-    if 'mysql' in os.getenv('DATABASE_URL', ''):
+    ca_cert = get_ca_cert_path()
+    if ca_cert and 'mysql' in os.getenv('DATABASE_URL', ''):
         DATABASES['default']['OPTIONS'] = {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'charset': 'utf8mb4',
             'use_unicode': True,
-            'ssl_mode': 'REQUIRED',
+            'autocommit': True,
+            'ssl': {'ca': ca_cert, 'check_hostname': False},
         }
 else:
     # Configuração local (SQLite padrão para desenvolvimento)
