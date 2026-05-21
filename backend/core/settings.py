@@ -118,13 +118,14 @@ DATABASES = {
         'USER': os.environ.get('DB_USER', 'avnadmin'),
         'PASSWORD': os.environ.get('DB_PASSWORD', ''),
         'HOST': os.environ.get('DB_HOST', ''),
-        'PORT': int(os.environ.get('DB_PORT', '3306')),
+        'PORT': os.environ.get('DB_PORT', '19616'),
         'OPTIONS': {
+            'ssl': {
+                'ca': os.environ.get('DB_CA_CERT', '/etc/ssl/certs/ca-certificates.crt'),
+            },
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'charset': 'utf8mb4',
-            'use_unicode': True,
-            'autocommit': True,
-        }
+        },
     }
 }
 
