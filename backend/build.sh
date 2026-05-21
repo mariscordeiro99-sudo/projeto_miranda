@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 # Exportar variáveis obrigatoriamente para os processos filhos
