@@ -111,79 +111,28 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-# Detecta o caminho do certificado CA da Aiven
-def get_ca_cert_path():
-    """Detecta o caminho do certificado CA disponível no sistema"""
-    possible_paths = [
-        os.getenv('DB_CA_CERT'),  # Variável de ambiente
-        '/opt/render/project/src/certs/ca.pem',  # Render custom
-        '/etc/ssl/certs/ca-certificates.crt',  # Linux
-        '/etc/ssl/certs/ca-bundle.crt',  # Linux
-        '/opt/render/project/src/certs/ca-bundle.crt',  # Render
-        BASE_DIR / 'certs' / 'ca.pem',  # Local do projeto
-    ]
-    
-    for path in possible_paths:
-        if path and os.path.exists(str(path)):
-            return str(path)
-    
-    return None
-
-# Configuração de Database
-if os.getenv('DB_HOST'):
-    # Configuração para produção com MySQL na Aiven (usando PyMySQL)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': os.getenv('DB_NAME', 'defaultdb'),
-            'USER': os.getenv('DB_USER', 'avnadmin'),
-            'PASSWORD': os.getenv('DB_PASSWORD'),
-            'HOST': os.getenv('DB_HOST'),
-            'PORT': int(os.getenv('DB_PORT', '3306')),
-            'ATOMIC_REQUESTS': True,
-            'CONN_MAX_AGE': 600,
-            'OPTIONS': {
-                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-                'charset': 'utf8mb4',
-                'use_unicode': True,
-                'autocommit': True,
-                # PyMySQL com SSL obrigatório
-                'ssl': {
-                    'ca': get_ca_cert_path(),
-                    'check_hostname': False,
-                    'require': True,  # Força SSL obrigatório
-                },
-            }
-        }
-    }
-elif os.getenv('DATABASE_URL'):
-    # Fallback para DATABASE_URL se configurada
-    DATABASES = {
-        'default': dj_database_url.config(
-            default=os.environ.get('DATABASE_URL'),
-            conn_max_age=600
-        ),
-    }
-    if 'mysql' in os.getenv('DATABASE_URL', ''):
-        DATABASES['default']['OPTIONS'] = {
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': int(os.getenv('DB_PORT', '3306')),
+        'ATOMIC_REQUESTS': True,
+        'CONN_MAX_AGE': 600,
+        'OPTIONS': {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'charset': 'utf8mb4',
             'use_unicode': True,
             'autocommit': True,
             'ssl': {
-                'ca': get_ca_cert_path(),
+                'ca': None,
                 'check_hostname': False,
-                'require': True,
-            },
-        }
-else:
-    # Configuração local (SQLite padrão para desenvolvimento)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            }
         }
     }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
