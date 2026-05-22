@@ -41,6 +41,26 @@ def env_list(name, default=''):
     return [item.strip() for item in value.split(',') if item.strip()]
 
 
+def db_ca_cert_path():
+    ca_cert = os.getenv('DB_CA_CERT') or os.getenv('DB_CA_CERT_CONTENT')
+    if not ca_cert:
+        return None
+
+    ca_cert = ca_cert.strip().strip('"').strip("'")
+    ca_cert = ca_cert.replace('\\n', '\n')
+
+    if 'BEGIN CERTIFICATE' not in ca_cert:
+        return ca_cert
+
+    cert_path = Path(os.getenv('DB_CA_CERT_PATH', '/tmp/aiven-ca.pem'))
+    if os.name == 'nt' and not os.getenv('DB_CA_CERT_PATH'):
+        cert_path = BASE_DIR / '.aiven-ca.pem'
+
+    cert_path.parent.mkdir(parents=True, exist_ok=True)
+    cert_path.write_text(ca_cert + '\n', encoding='utf-8')
+    return str(cert_path)
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -167,8 +187,9 @@ DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 10)
 
 if env_bool('DB_SSL_REQUIRED', True):
     ssl_options = {}
-    if os.getenv('DB_CA_CERT'):
-        ssl_options['ca'] = os.getenv('DB_CA_CERT')
+    ca_path = db_ca_cert_path()
+    if ca_path:
+        ssl_options['ca'] = ca_path
     DATABASES['default']['OPTIONS'].setdefault('ssl', ssl_options)
 
 

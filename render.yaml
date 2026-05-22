@@ -25,6 +25,8 @@ services:
         sync: false
       - key: DB_PORT
         sync: false
+      - key: DB_CA_CERT
+        sync: false
       - key: DB_SSL_REQUIRED
         value: "true"
       - key: CORS_ALLOW_ALL_ORIGINS
