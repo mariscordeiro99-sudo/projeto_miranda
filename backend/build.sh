@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+cd "$(dirname "$0")"
 
 # Exportar variáveis obrigatoriamente para os processos filhos
 export DB_NAME="${DB_NAME:-defaultdb}"
@@ -21,6 +22,10 @@ pip install -r requirements.txt
 echo ""
 echo "=== Running migrations ==="
 python manage.py migrate
+
+echo ""
+echo "=== Collecting static files ==="
+python manage.py collectstatic --noinput
 
 echo ""
 echo "=== Build completed successfully ==="

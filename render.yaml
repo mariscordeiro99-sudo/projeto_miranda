@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: projeto-miranda-backend
+    runtime: python
+    plan: free
+    rootDir: .
+    buildCommand: bash backend/build.sh
+    startCommand: cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /health/
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.2
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_SSL_REQUIRED
+        value: "true"
+      - key: CORS_ALLOW_ALL_ORIGINS
+        value: "false"

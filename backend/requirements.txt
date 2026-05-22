@@ -22,4 +22,3 @@ pillow
 requests
 
 whitenoise==6.6.0
-mysqlclient
