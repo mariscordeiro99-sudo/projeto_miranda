@@ -1,77 +1,81 @@
 #!/usr/bin/env python
 """
-Script para testar a conexão com o banco de dados MySQL na Aiven.
-Execute com: python test_db_connection.py
+Script para testar a conexao com o banco de dados configurado no backend.
+Execute com: python scripts/test_db_connection.py
 """
 
 import os
 import sys
+
 import django
 from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente
-load_dotenv('.env.production')
 
-# Configuração do Django
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
+
+for filename in ['.env.production', 'env.production', '.env']:
+    env_path = os.path.join(backend_dir, filename)
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+        break
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 django.setup()
 
-from django.db import connections
-from django.db.utils import OperationalError
+from django.db import connections  # noqa: E402
+from django.db.utils import OperationalError  # noqa: E402
+
 
 def test_database_connection():
-    """Testa a conexão com o banco de dados"""
-    
     print("=" * 60)
-    print("TESTE DE CONEXÃO COM BANCO DE DADOS AIVEN")
+    print("TESTE DE CONEXAO COM BANCO DE DADOS")
     print("=" * 60)
-    
-    # Exibe variáveis de conexão (sem expor a senha)
-    print(f"\n📋 Variáveis de Conexão Detectadas:")
+
+    print("\nVariaveis de conexao detectadas:")
     print(f"   DB_HOST: {os.getenv('DB_HOST')}")
     print(f"   DB_USER: {os.getenv('DB_USER')}")
     print(f"   DB_NAME: {os.getenv('DB_NAME')}")
     print(f"   DB_PORT: {os.getenv('DB_PORT')}")
     print(f"   DB_PASSWORD: {'*' * len(os.getenv('DB_PASSWORD', ''))}")
-    
-    # Tenta conectar
+
     try:
         connection = connections['default']
         cursor = connection.cursor()
         cursor.execute("SELECT 1")
         cursor.fetchone()
         cursor.close()
-        
-        print(f"\n✅ Conexão com sucesso!")
+
+        print("\nConexao com sucesso!")
         print(f"   Engine: {connection.settings_dict['ENGINE']}")
         print(f"   Options: {connection.settings_dict.get('OPTIONS', {})}")
-        
-        # Testa uma query simples
+
         cursor = connection.cursor()
         cursor.execute("SELECT VERSION()")
         version = cursor.fetchone()
         print(f"   MySQL Version: {version[0]}")
         cursor.close()
-        
+
         return True
-        
-    except OperationalError as e:
-        print(f"\n❌ Erro de Conexão Operacional:")
-        print(f"   {str(e)}")
-        print(f"\n   Este erro geralmente significa:")
-        if "1045" in str(e):
-            print(f"   - Credenciais incorretas (usuário/senha)")
-            print(f"   - SSL não está sendo negociado corretamente")
-            print(f"   - Método de autenticação SHA256_password sem suporte SSL")
-        elif "2003" in str(e):
-            print(f"   - Host não é acessível")
-            print(f"   - IP do Render não está na allowlist da Aiven")
+
+    except OperationalError as error:
+        print("\nErro de conexao operacional:")
+        print(f"   {error}")
+        print("\n   Este erro geralmente significa:")
+        if "1045" in str(error):
+            print("   - Credenciais incorretas (usuario/senha)")
+            print("   - SSL nao esta sendo negociado corretamente")
+            print("   - Metodo de autenticacao SHA256_password sem suporte SSL")
+        elif "2003" in str(error):
+            print("   - Host nao esta acessivel")
+            print("   - IP da maquina nao esta na allowlist do provedor")
         return False
-        
-    except Exception as e:
-        print(f"\n❌ Erro Inesperado:")
-        print(f"   {type(e).__name__}: {str(e)}")
+
+    except Exception as error:
+        print("\nErro inesperado:")
+        print(f"   {type(error).__name__}: {error}")
         return False
+
 
 if __name__ == '__main__':
     success = test_database_connection()
