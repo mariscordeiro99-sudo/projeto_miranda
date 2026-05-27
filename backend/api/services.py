@@ -12,6 +12,12 @@ except ImportError:  # pragma: no cover - dependency may be absent locally befor
     messaging = None
 
 
+def normalize_firebase_private_key(private_key):
+    private_key = (private_key or '').strip()
+    private_key = private_key.strip('"').strip("'")
+    return private_key.replace('\\n', '\n').strip()
+
+
 class PushNotificationService:
     def __init__(self):
         self.enabled = getattr(settings, 'FIREBASE_ENABLED', False)
@@ -33,7 +39,7 @@ class PushNotificationService:
         if firebase_admin._apps:
             return firebase_admin.get_app()
 
-        private_key = self.private_key.replace('\\n', '\n')
+        private_key = normalize_firebase_private_key(self.private_key)
         cert = credentials.Certificate(
             {
                 'type': 'service_account',

@@ -402,14 +402,23 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
     def stats(self, request, pk=None):
         announcement = self.get_object()
         logs = announcement.delivery_logs.all()
+        failed_logs = logs.filter(status=DeliveryLog.STATUS_FAILED)
         return Response(
             {
                 'announcement': announcement.id,
                 'pending': logs.filter(status=DeliveryLog.STATUS_PENDING).count(),
                 'sent': logs.filter(status=DeliveryLog.STATUS_SENT).count(),
-                'failed': logs.filter(status=DeliveryLog.STATUS_FAILED).count(),
+                'failed': failed_logs.count(),
                 'viewed': logs.filter(status=DeliveryLog.STATUS_VIEWED).count(),
                 'total': logs.count(),
+                'failed_errors': [
+                    {
+                        'log_id': log.id,
+                        'device_id': log.device_id,
+                        'error_message': log.error_message,
+                    }
+                    for log in failed_logs.select_related('device')
+                ],
             }
         )
 
