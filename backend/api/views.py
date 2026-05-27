@@ -376,8 +376,14 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             self.create_pending_delivery_logs(announcement)
         return Response(self.get_serializer(announcement).data)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
-    def dispatch(self, request, pk=None):
+    @action(
+        detail=True,
+        methods=['post'],
+        permission_classes=[permissions.IsAdminUser],
+        url_path='dispatch',
+        url_name='dispatch',
+    )
+    def dispatch_push(self, request, pk=None):
         announcement = self.get_object()
         self.create_pending_delivery_logs(announcement)
         result = PushNotificationService().dispatch_pending_for_announcement(announcement)
