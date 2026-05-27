@@ -415,6 +415,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
                     {
                         'log_id': log.id,
                         'device_id': log.device_id,
+                        'device_is_active': log.device.is_active if log.device else None,
                         'error_message': log.error_message,
                     }
                     for log in failed_logs.select_related('device')

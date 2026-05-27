@@ -19,6 +19,14 @@ def normalize_firebase_private_key(private_key):
 
 
 class PushNotificationService:
+    INVALID_TOKEN_MESSAGES = (
+        'not a valid FCM registration token',
+        'registration token is not a valid',
+        'requested entity was not found',
+        'registration-token-not-registered',
+        'unregistered',
+    )
+
     def __init__(self):
         self.enabled = getattr(settings, 'FIREBASE_ENABLED', False)
         self.project_id = getattr(settings, 'FIREBASE_PROJECT_ID', '')
@@ -84,7 +92,10 @@ class PushNotificationService:
                 )
                 messaging.send(message, app=app)
             except Exception as error:
-                self.mark_failed(log, str(error))
+                message = str(error)
+                if self.is_invalid_token_error(message):
+                    self.deactivate_device(log.device)
+                self.mark_failed(log, message)
                 result['failed'] += 1
                 continue
 
@@ -99,6 +110,15 @@ class PushNotificationService:
 
     def mark_failed(self, log, message):
         mark_failed_delivery(log, message)
+
+    def is_invalid_token_error(self, message):
+        normalized_message = message.lower()
+        return any(error_message.lower() in normalized_message for error_message in self.INVALID_TOKEN_MESSAGES)
+
+    def deactivate_device(self, device):
+        if device and device.is_active:
+            device.is_active = False
+            device.save(update_fields=['is_active', 'updated_at'])
 
 
 class HttpPushNotificationService:

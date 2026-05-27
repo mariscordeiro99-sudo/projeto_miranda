@@ -9,6 +9,10 @@ class Document(models.Model):
     content = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        verbose_name = 'Documento'
+        verbose_name_plural = 'Documentos'
+
     def __str__(self):
         return self.title
 
@@ -17,8 +21,8 @@ class Profile(models.Model):
     ROLE_CITIZEN = 'citizen'
     ROLE_MANAGER = 'manager'
     ROLE_CHOICES = [
-        (ROLE_CITIZEN, 'Citizen'),
-        (ROLE_MANAGER, 'Manager'),
+        (ROLE_CITIZEN, 'Cidadao'),
+        (ROLE_MANAGER, 'Gestor'),
     ]
 
     user = models.OneToOneField(
@@ -32,6 +36,10 @@ class Profile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = 'Perfil'
+        verbose_name_plural = 'Perfis'
+
     def __str__(self):
         return f'{self.user.username} ({self.role})'
 
@@ -40,8 +48,8 @@ class Institution(models.Model):
     KIND_CITY_HALL = 'city_hall'
     KIND_COUNCIL = 'council'
     KIND_CHOICES = [
-        (KIND_CITY_HALL, 'City Hall'),
-        (KIND_COUNCIL, 'Council'),
+        (KIND_CITY_HALL, 'Prefeitura'),
+        (KIND_COUNCIL, 'Camara'),
     ]
 
     name = models.CharField(max_length=180)
@@ -52,6 +60,10 @@ class Institution(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = 'Instituicao'
+        verbose_name_plural = 'Instituicoes'
+
     def __str__(self):
         return self.name
 
@@ -59,7 +71,7 @@ class Institution(models.Model):
 class VisualIdentity(models.Model):
     hex_color_validator = RegexValidator(
         regex=r'^#[0-9A-Fa-f]{6}$',
-        message='Use a hexadecimal color like #123ABC.',
+        message='Use uma cor hexadecimal como #123ABC.',
     )
 
     institution = models.OneToOneField(
@@ -73,8 +85,12 @@ class VisualIdentity(models.Model):
     secondary_color = models.CharField(max_length=7, validators=[hex_color_validator], default='#00A676')
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = 'Identidade visual'
+        verbose_name_plural = 'Identidades visuais'
+
     def __str__(self):
-        return f'Visual identity - {self.institution.name}'
+        return f'Identidade visual - {self.institution.name}'
 
 
 class Announcement(models.Model):
@@ -82,9 +98,9 @@ class Announcement(models.Model):
     STATUS_PUBLISHED = 'published'
     STATUS_ARCHIVED = 'archived'
     STATUS_CHOICES = [
-        (STATUS_DRAFT, 'Draft'),
-        (STATUS_PUBLISHED, 'Published'),
-        (STATUS_ARCHIVED, 'Archived'),
+        (STATUS_DRAFT, 'Rascunho'),
+        (STATUS_PUBLISHED, 'Publicado'),
+        (STATUS_ARCHIVED, 'Arquivado'),
     ]
 
     institution = models.ForeignKey(
@@ -110,6 +126,8 @@ class Announcement(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        verbose_name = 'Comunicado'
+        verbose_name_plural = 'Comunicados'
         ordering = ['-pinned', '-published_at', '-created_at']
         indexes = [
             models.Index(fields=['status', 'published_at']),
@@ -131,10 +149,10 @@ class Attachment(models.Model):
     TYPE_VIDEO = 'video'
     TYPE_OTHER = 'other'
     TYPE_CHOICES = [
-        (TYPE_DOCUMENT, 'Document'),
-        (TYPE_IMAGE, 'Image'),
+        (TYPE_DOCUMENT, 'Documento'),
+        (TYPE_IMAGE, 'Imagem'),
         (TYPE_VIDEO, 'Video'),
-        (TYPE_OTHER, 'Other'),
+        (TYPE_OTHER, 'Outro'),
     ]
 
     announcement = models.ForeignKey(
@@ -146,6 +164,10 @@ class Attachment(models.Model):
     original_name = models.CharField(max_length=255)
     file_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_OTHER)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Anexo'
+        verbose_name_plural = 'Anexos'
 
     def __str__(self):
         return self.original_name
@@ -174,6 +196,10 @@ class PushDevice(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    class Meta:
+        verbose_name = 'Dispositivo push'
+        verbose_name_plural = 'Dispositivos push'
+
     def __str__(self):
         return f'{self.platform} - {self.token[:12]}'
 
@@ -181,7 +207,7 @@ class PushDevice(models.Model):
 class DeliveryLog(models.Model):
     CHANNEL_PUSH = 'push'
     CHANNEL_CHOICES = [
-        (CHANNEL_PUSH, 'Push notification'),
+        (CHANNEL_PUSH, 'Notificacao push'),
     ]
 
     STATUS_PENDING = 'pending'
@@ -189,10 +215,10 @@ class DeliveryLog(models.Model):
     STATUS_FAILED = 'failed'
     STATUS_VIEWED = 'viewed'
     STATUS_CHOICES = [
-        (STATUS_PENDING, 'Pending'),
-        (STATUS_SENT, 'Sent'),
-        (STATUS_FAILED, 'Failed'),
-        (STATUS_VIEWED, 'Viewed'),
+        (STATUS_PENDING, 'Pendente'),
+        (STATUS_SENT, 'Enviado'),
+        (STATUS_FAILED, 'Falhou'),
+        (STATUS_VIEWED, 'Visualizado'),
     ]
 
     announcement = models.ForeignKey(
@@ -222,6 +248,8 @@ class DeliveryLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        verbose_name = 'Log de entrega'
+        verbose_name_plural = 'Logs de entrega'
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['announcement', 'status']),

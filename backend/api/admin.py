@@ -11,6 +11,11 @@ from .models import (
 )
 
 
+admin.site.site_header = 'Administracao do Projeto Miranda'
+admin.site.site_title = 'Projeto Miranda'
+admin.site.index_title = 'Painel de administracao'
+
+
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
     list_display = ('title', 'created_at')
