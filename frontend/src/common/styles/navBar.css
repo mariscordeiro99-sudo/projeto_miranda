@@ -11,18 +11,7 @@
     padding: 0 30px;
     box-sizing: border-box;
     border-bottom: 1px solid #f0f0f0;
-    z-index: 1000;
-}
-
-.nav-section {
-    display: flex;
-    align-items: center;
-    flex: 1; 
-}
-
-.nav-left {
-    justify-content: flex-start;
-    gap: 15px;
+    z-index: 9999; 
 }
 
 .nav-icon-btn {
@@ -35,10 +24,29 @@
     display: flex;
     align-items: center;
     color: #000000;
+    pointer-events: auto;
 }
 
 .nav-icon-btn:hover {
     background-color: #f8fafc;
+}
+
+.nav-right {
+    justify-content: flex-end;
+    gap: 12px;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.nav-section {
+    display: flex;
+    align-items: center;
+    flex: 1; 
+}
+
+.nav-left {
+    justify-content: flex-start;
+    gap: 15px;
 }
 
 .nav-divider {

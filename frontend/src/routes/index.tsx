@@ -9,6 +9,7 @@ import { useRoleRedirect } from '../routes/hooks/useRoleRedirect';
 import { CommunicationPage } from '../pages/communication';
 import { AppRoutes } from '../routes/types/loginReg';
 import { RegisterPage } from '../pages/register';
+import { ProtectedRoute } from './protectedRoute';
 
 export const AppRouter: React.FC = () => {
   const { shouldRequireLogin, saveExitTime } = useSessionGuard();
@@ -19,13 +20,13 @@ export const AppRouter: React.FC = () => {
     window.addEventListener('beforeunload', handleUnload);
 
     return () => window.removeEventListener('beforeunload', handleUnload);
-  }, []);
+  }, [saveExitTime]);
 
   const renderDashboardElement = () => {
     const targetPath = getInitialRoutePath();
 
-    if (targetPath === AppRoutes.COMUNICADOS) {
-      return <Navigate to={AppRoutes.COMUNICADOS} replace />;
+    if (targetPath && targetPath !== AppRoutes.DASHBOARD) {
+      return <Navigate to={targetPath} replace />;
     }
 
     return <DashboardPage />;
@@ -35,31 +36,21 @@ export const AppRouter: React.FC = () => {
     <BrowserRouter>
       <Routes>
         <Route path={AppRoutes.SPLASH} element={<SplashPage />} />
-
+        
         <Route
           path={AppRoutes.LOGIN}
-          element={shouldRequireLogin() ? <LoginPage /> : <Navigate to={AppRoutes.DASHBOARD} />}
+          element={shouldRequireLogin() ? <LoginPage /> : <Navigate to={AppRoutes.DASHBOARD} replace />}
         />
+        
+        <Route path={AppRoutes.REGISTER} element={<RegisterPage />} />
+        <Route path={AppRoutes.LOGIN_SUCCESS} element={<LoginSuccessPage />} />
 
-        <Route
-          path={AppRoutes.REGISTER}
-          element={<RegisterPage />}
-        />
+        <Route element={<ProtectedRoute />}>
+          <Route path={AppRoutes.DASHBOARD} element={renderDashboardElement()} />
+          <Route path={AppRoutes.COMUNICADOS} element={<CommunicationPage />} />
+        </Route>
 
-        <Route
-          path={AppRoutes.LOGIN_SUCCESS}
-          element={<LoginSuccessPage />}
-        />
-
-        <Route
-          path={AppRoutes.DASHBOARD}
-          element={renderDashboardElement()}
-        />
-
-        <Route
-          path={AppRoutes.COMUNICADOS}
-          element={<CommunicationPage />}
-        />
+        <Route path="*" element={<Navigate to={AppRoutes.LOGIN} replace />} />
       </Routes>
     </BrowserRouter>
   );

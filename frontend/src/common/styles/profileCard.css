@@ -4,18 +4,19 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 2500;
+    background-color: rgba(0, 0, 0, 0.05);
+    z-index: 10002;
 }
 
 .profile-card {
     position: fixed;
-    top: 70px; /* Logo abaixo da NavBar */
+    top: 80px;
     right: 20px;
     width: 280px;
     background: white;
     border-radius: 16px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    z-index: 2501;
+    z-index: 10003;
     overflow: hidden;
     animation: slideInDown 0.2s ease-out;
 }

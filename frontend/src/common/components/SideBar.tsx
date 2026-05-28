@@ -4,13 +4,13 @@ import {
   X, LayoutDashboard, ShieldCheck, FileEdit,
   MessageCircle, Bell, Palette
 } from 'lucide-react';
-import type { SideMenuProps } from '../types/sideBar';
-import type { SidebarPermissions } from '../types/sideBar';
+import { AppRoutes } from '../../routes/types/loginReg';
+import type { SideMenuProps, NavBarPermissions } from '../types/navBar';
 import '../styles/sideBar.css';
 
 const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, userRole, permissions }) => {
 
-  const canSee = (perm: keyof SidebarPermissions) => {
+  const canSee = (perm: keyof NavBarPermissions) => {
     return userRole === 'gestor' || permissions[perm] === true;
   };
 
@@ -27,7 +27,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, userRole, permissi
             <small className="user-role-badge">{userRole}</small>
             <h2 className="sidebar-title">Navegação</h2>
           </div>
-          <button className="close-sidebar" onClick={onClose}>
+          <button className="close-sidebar" onClick={onClose} aria-label="Fechar menu">
             <X size={24} />
           </button>
         </div>
@@ -39,7 +39,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, userRole, permissi
               <span className="section-label">Administração</span>
 
               {canSee('painelGestor') && (
-                <Link to="/dashboard" className="menu-link" onClick={onClose}>
+                <Link to={AppRoutes.DASHBOARD} className="menu-link" onClick={onClose}>
                   <LayoutDashboard size={20} /> Painel do Gestor
                 </Link>
               )}
@@ -68,7 +68,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, userRole, permissi
             <span className="section-label">Comunicação</span>
 
             {canSee('comunicados') && (
-              <Link to="/comunicados" className="menu-link" onClick={onClose}>
+              <Link to={AppRoutes.COMUNICADOS} className="menu-link" onClick={onClose}>
                 <Bell size={20} /> Comunicados
               </Link>
             )}
