@@ -7,6 +7,7 @@ import { DashboardPage } from '../pages/dashboard';
 import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
 import { useRoleRedirect } from '../routes/hooks/useRoleRedirect';
 import { CommunicationPage } from '../pages/communication';
+import { ConversationPage } from '../pages/conversation';
 import { AppRoutes } from '../routes/types/loginReg';
 import { RegisterPage } from '../pages/register';
 import { ProtectedRoute } from './protectedRoute';
@@ -48,6 +49,7 @@ export const AppRouter: React.FC = () => {
         <Route element={<ProtectedRoute />}>
           <Route path={AppRoutes.DASHBOARD} element={renderDashboardElement()} />
           <Route path={AppRoutes.COMUNICADOS} element={<CommunicationPage />} />
+          <Route path={AppRoutes.CONVERSAS} element={<ConversationPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to={AppRoutes.LOGIN} replace />} />

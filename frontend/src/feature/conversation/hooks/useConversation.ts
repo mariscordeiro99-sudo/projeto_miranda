@@ -50,7 +50,6 @@ export const useConversas = () => {
     carregarContatos();
   }, []);
 
-  // Carrega o histórico de mensagens quando um contato é selecionado
   useEffect(() => {
     if (!contatoAtivo) {
       setMensagens([]);
@@ -58,7 +57,6 @@ export const useConversas = () => {
     }
 
     const carregarHistorico = () => {
-      // Zera notificações não lidas ao clicar
       setContatos(prev => prev.map(c => c.id === contatoAtivo.id ? { ...c, naoLidas: 0 } : c));
 
       const historicoMock: Mensagem[] = [
@@ -104,7 +102,6 @@ export const useConversas = () => {
 
     setMensagens(prev => [...prev, novaMsg]);
     
-    // Atualiza a prévia da última mensagem na lista lateral
     setContatos(prev => prev.map(c => 
       c.id === contatoAtivo.id 
         ? { ...c, ultimaMensagem: novaMsg.texto, timestampUltima: novaMsg.timestamp } 
