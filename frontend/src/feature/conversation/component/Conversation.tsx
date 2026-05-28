@@ -1,7 +1,7 @@
 import React from 'react';
 import { User, Send, MessageSquare } from 'lucide-react';
 import { useConversas } from '../hooks/useConversation';
-import '../style/conversas.css';
+import '../style/conversation.css';
 
 export const ConversasPage: React.FC = () => {
     const {
