@@ -5,5 +5,6 @@ export const AppRoutes = {
   LOGIN_SUCCESS: '/login-success',
   DASHBOARD: '/dashboard',
   COMUNICADOS: '/comunicados',
-  CONVERSAS: '/conversas'
+  CONVERSAS: '/conversas',
+  EDICAO_COMUNICADOS: '/edicao-comunicados'
 }

@@ -8,6 +8,7 @@ import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
 import { useRoleRedirect } from '../routes/hooks/useRoleRedirect';
 import { CommunicationPage } from '../pages/communication';
 import { ConversationPage } from '../pages/conversation';
+import { AnnouncementsEdtPage } from '../pages/announEdt';
 import { AppRoutes } from '../routes/types/loginReg';
 import { RegisterPage } from '../pages/register';
 import { ProtectedRoute } from './protectedRoute';
@@ -37,12 +38,12 @@ export const AppRouter: React.FC = () => {
     <BrowserRouter>
       <Routes>
         <Route path={AppRoutes.SPLASH} element={<SplashPage />} />
-        
+
         <Route
           path={AppRoutes.LOGIN}
           element={shouldRequireLogin() ? <LoginPage /> : <Navigate to={AppRoutes.DASHBOARD} replace />}
         />
-        
+
         <Route path={AppRoutes.REGISTER} element={<RegisterPage />} />
         <Route path={AppRoutes.LOGIN_SUCCESS} element={<LoginSuccessPage />} />
 
@@ -50,6 +51,8 @@ export const AppRouter: React.FC = () => {
           <Route path={AppRoutes.DASHBOARD} element={renderDashboardElement()} />
           <Route path={AppRoutes.COMUNICADOS} element={<CommunicationPage />} />
           <Route path={AppRoutes.CONVERSAS} element={<ConversationPage />} />
+          <Route path={AppRoutes.EDICAO_COMUNICADOS} element={<AnnouncementsEdtPage />} />
+
         </Route>
 
         <Route path="*" element={<Navigate to={AppRoutes.LOGIN} replace />} />
