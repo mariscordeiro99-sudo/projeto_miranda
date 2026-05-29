@@ -1,0 +1,181 @@
+.admin-container {
+    padding: 30px;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+.admin-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 35px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 20px;
+}
+
+.admin-header-row h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    color: #0f172a;
+    order: 1;
+}
+
+.create-comunicado-btn {
+    order: 2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #4169E1 0%, #7f00ff 100%);
+    color: #ffffff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(65, 105, 225, 0.25);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.create-comunicado-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(65, 105, 225, 0.35);
+}
+
+.create-comunicado-btn:active {
+    transform: translateY(0);
+}
+
+.admin-list-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 24px;
+}
+
+.empty-admin-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px;
+    color: #64748b;
+    background-color: #ffffff;
+    border: 2px dashed #e2e8f0;
+    border-radius: 16px;
+    font-size: 15px;
+}
+
+.admin-card {
+    background-color: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    transition: all 0.25s ease;
+}
+
+.admin-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+    border-color: #cbd5e1;
+}
+
+.admin-card.is-disabled {
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+    opacity: 0.7;
+}
+
+.admin-card.is-disabled h3,
+.admin-card.is-disabled p {
+    color: #94a3b8;
+}
+
+.admin-card-content {
+    padding: 24px;
+    flex: 1;
+}
+
+.card-date {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+
+.admin-card-content h3 {
+    margin: 0 0 12px 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.4;
+}
+
+.admin-card-content p {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.card-attachment-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #f1f5f9;
+    color: #475569;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.admin-card-actions {
+    display: flex;
+    border-top: 1px solid #f1f5f9;
+    background-color: #fafafa;
+}
+
+.action-btn {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.action-btn:not(:last-child) {
+    border-right: 1px solid #f1f5f9;
+}
+
+.action-btn.edit { color: #4169E1; }
+.action-btn.edit:hover { background-color: #f0f4ff; }
+
+.action-btn.toggle { color: #64748b; }
+.action-btn.toggle.active { color: #10b981; }
+.action-btn.toggle:hover { background-color: #f8fafc; }
+
+.action-btn.delete { color: #ef4444; }
+.action-btn.delete:hover { background-color: #fef2f2; }
+
+@media (max-width: 600px) {
+    .admin-header-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+    }
+    .admin-header-row h2 { order: 1; }
+    .create-comunicado-btn { order: 2; justify-content: center; }
+}
