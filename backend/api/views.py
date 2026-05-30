@@ -1,3 +1,4 @@
+import cloudinary.exceptions
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
@@ -5,6 +6,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.db import transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils import timezone
@@ -94,6 +96,7 @@ class HelloView(APIView):
 class RegisterView(APIView):
     authentication_classes = []
     permission_classes = []
+    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
 
     def post(self, request, *args, **kwargs):
         username = request.data.get('username', '')
@@ -102,6 +105,7 @@ class RegisterView(APIView):
         first_name = request.data.get('first_name', '')
         phone = request.data.get('telefone', '') or request.data.get('phone_number', '')
         is_gestor = str(request.data.get('isGestor', '') or request.data.get('is_gestor', '')).lower() in ('true', '1', 'yes')
+        profile_picture = request.FILES.get('profile_picture')
 
         if not username or not email or not password:
             return Response(
@@ -121,21 +125,28 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = User(
-            username=username,
-            email=email,
-            first_name=first_name,
-            last_name=phone,
-            is_staff=is_gestor,
-        )
-        user.set_password(password)
-        user.save()
-        Profile.objects.create(
-            user=user,
-            phone_number=phone,
-            role=Profile.ROLE_MANAGER if is_gestor else Profile.ROLE_CITIZEN,
-            profile_picture=request.FILES.get('profile_picture'),
-        )
+        try:
+            with transaction.atomic():
+                user = User(
+                    username=username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=phone,
+                    is_staff=is_gestor,
+                )
+                user.set_password(password)
+                user.save()
+                Profile.objects.create(
+                    user=user,
+                    phone_number=phone,
+                    role=Profile.ROLE_MANAGER if is_gestor else Profile.ROLE_CITIZEN,
+                    profile_picture=profile_picture,
+                )
+        except cloudinary.exceptions.Error:
+            return Response(
+                {'detail': 'Nao foi possivel enviar a foto de perfil. Tente novamente.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return Response(
             {

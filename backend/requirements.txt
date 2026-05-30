@@ -21,5 +21,6 @@ python-dotenv==1.0.1
 pillow
 requests
 firebase-admin==6.5.0
+cloudinary
 
 whitenoise==6.6.0
