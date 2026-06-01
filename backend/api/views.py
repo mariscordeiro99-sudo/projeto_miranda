@@ -27,6 +27,7 @@ from .models import (
     PushDevice,
     VisualIdentity,
 )
+from .media_validation import VideoDurationValidationError, validate_video_duration
 from .serializers import (
     AnnouncementSerializer,
     AttachmentSerializer,
@@ -41,6 +42,13 @@ from .services import PushNotificationService
 
 
 MAX_ATTACHMENT_SIZE = 60 * 1024 * 1024
+MAX_VIDEO_DURATION_SECONDS = 60
+MAX_PROFILE_IMAGE_SIZE = 10 * 1024 * 1024
+ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = {
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+}
 ALLOWED_ATTACHMENT_CONTENT_TYPES = {
     'application/pdf',
     'application/msword',
@@ -75,6 +83,23 @@ def validate_attachment(uploaded_file):
         raise DRFValidationError(f'Unsupported attachment type: {content_type or "unknown"}.')
     if uploaded_file.size > MAX_ATTACHMENT_SIZE:
         raise DRFValidationError('Attachment exceeds the 60MB limit.')
+    if content_type.startswith('video/'):
+        try:
+            validate_video_duration(uploaded_file, MAX_VIDEO_DURATION_SECONDS)
+        except VideoDurationValidationError as error:
+            raise DRFValidationError(str(error))
+
+
+def validate_profile_picture(uploaded_file):
+    if not uploaded_file:
+        return
+
+    content_type = getattr(uploaded_file, 'content_type', '') or ''
+    if content_type not in ALLOWED_PROFILE_IMAGE_CONTENT_TYPES:
+        raise DRFValidationError('A foto de perfil deve ser JPG, PNG ou WEBP.')
+
+    if uploaded_file.size > MAX_PROFILE_IMAGE_SIZE:
+        raise DRFValidationError('A foto de perfil deve ter no maximo 10MB.')
 
 
 class IsManagerOrReadOnly(permissions.BasePermission):
@@ -104,12 +129,29 @@ class RegisterView(APIView):
         password = request.data.get('password', '')
         first_name = request.data.get('first_name', '')
         phone = request.data.get('telefone', '') or request.data.get('phone_number', '')
-        is_gestor = str(request.data.get('isGestor', '') or request.data.get('is_gestor', '')).lower() in ('true', '1', 'yes')
         profile_picture = request.FILES.get('profile_picture')
+        requested_manager_access = str(
+            request.data.get('isGestor', '') or request.data.get('is_gestor', '')
+        ).lower() in ('true', '1', 'yes')
 
         if not username or not email or not password:
             return Response(
                 {'detail': 'username, email and password are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if requested_manager_access:
+            return Response(
+                {'detail': 'Cadastro de gestor deve ser feito por um administrador autorizado.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            validate_profile_picture(profile_picture)
+        except DRFValidationError as error:
+            detail = error.detail[0] if isinstance(error.detail, list) else error.detail
+            return Response(
+                {'detail': str(detail)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -132,14 +174,14 @@ class RegisterView(APIView):
                     email=email,
                     first_name=first_name,
                     last_name=phone,
-                    is_staff=is_gestor,
+                    is_staff=False,
                 )
                 user.set_password(password)
                 user.save()
                 Profile.objects.create(
                     user=user,
                     phone_number=phone,
-                    role=Profile.ROLE_MANAGER if is_gestor else Profile.ROLE_CITIZEN,
+                    role=Profile.ROLE_CITIZEN,
                     profile_picture=profile_picture,
                 )
         except cloudinary.exceptions.Error:

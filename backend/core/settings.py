@@ -188,19 +188,20 @@ else:
         }
     }
 
-DATABASES['default'].setdefault('OPTIONS', {})
-DATABASES['default']['OPTIONS'].setdefault(
-    'init_command',
-    "SET sql_mode='STRICT_TRANS_TABLES'",
-)
-DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 10)
+if 'mysql' in DATABASES['default'].get('ENGINE', ''):
+    DATABASES['default'].setdefault('OPTIONS', {})
+    DATABASES['default']['OPTIONS'].setdefault(
+        'init_command',
+        "SET sql_mode='STRICT_TRANS_TABLES'",
+    )
+    DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 10)
 
-if env_bool('DB_SSL_REQUIRED', True):
-    ssl_options = {}
-    ca_path = db_ca_cert_path()
-    if ca_path:
-        ssl_options['ca'] = ca_path
-    DATABASES['default']['OPTIONS'].setdefault('ssl', ssl_options)
+    if env_bool('DB_SSL_REQUIRED', True):
+        ssl_options = {}
+        ca_path = db_ca_cert_path()
+        if ca_path:
+            ssl_options['ca'] = ca_path
+        DATABASES['default']['OPTIONS'].setdefault('ssl', ssl_options)
 
 
 # Password validation
