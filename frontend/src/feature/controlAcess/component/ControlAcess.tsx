@@ -1,7 +1,7 @@
 import React from 'react';
 import { Shield, Search, User, Save } from 'lucide-react';
 import { useControleAcesso } from '../hook/useControlAcess';
-import '../style/controleAcesso.css';
+import '../style/controlAcess.css';
 
 export const AccessControlPage: React.FC = () => {
     const { usuarios, busca, setBusca, isLoading, alternarPermissao, salvarAcessoUsuario } = useControleAcesso();
