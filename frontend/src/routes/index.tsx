@@ -8,6 +8,7 @@ import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
 import { useRoleRedirect } from '../routes/hooks/useRoleRedirect';
 import { CommunicationPage } from '../pages/communication';
 import { ConversationPage } from '../pages/conversation';
+import { ControlAcessPage } from '../pages/controlAcess';
 import { AnnouncementsEdtPage } from '../pages/announEdt';
 import { AppRoutes } from '../routes/types/loginReg';
 import { RegisterPage } from '../pages/register';
@@ -52,6 +53,7 @@ export const AppRouter: React.FC = () => {
           <Route path={AppRoutes.COMUNICADOS} element={<CommunicationPage />} />
           <Route path={AppRoutes.CONVERSAS} element={<ConversationPage />} />
           <Route path={AppRoutes.EDICAO_COMUNICADOS} element={<AnnouncementsEdtPage />} />
+          <Route path={AppRoutes.CONTROLE_ACESSO} element={<ControlAcessPage />} />
 
         </Route>
 
