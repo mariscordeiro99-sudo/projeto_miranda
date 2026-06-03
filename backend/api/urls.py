@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     AnnouncementViewSet,
     AttachmentViewSet,
+    DashboardReportView,
     DeliveryLogViewSet,
     DocumentViewSet,
     HelloView,
@@ -24,5 +25,6 @@ router.register(r'delivery-logs', DeliveryLogViewSet, basename='delivery-log')
 
 urlpatterns = [
     path('hello/', HelloView.as_view(), name='hello'),
+    path('reports/dashboard/', DashboardReportView.as_view(), name='dashboard-report'),
     path('', include(router.urls)),
 ]

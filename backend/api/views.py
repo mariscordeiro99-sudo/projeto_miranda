@@ -10,7 +10,8 @@ from django.db import transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils import timezone
-from rest_framework import parsers, permissions, status, throttling, viewsets
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import parsers, permissions, serializers, status, throttling, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -28,6 +29,7 @@ from .models import (
     VisualIdentity,
 )
 from .media_validation import VideoDurationValidationError, validate_video_duration
+from .reports import build_dashboard_report
 from .serializers import (
     AnnouncementSerializer,
     AttachmentSerializer,
@@ -118,6 +120,27 @@ class HelloView(APIView):
             'status': 'healthy',
             'version': '1.0.0',
         })
+
+
+class DashboardReportView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    @extend_schema(
+        responses=inline_serializer(
+            name='DashboardReportResponse',
+            fields={
+                'users': serializers.DictField(),
+                'announcements': serializers.DictField(),
+                'delivery': serializers.DictField(),
+                'devices': serializers.DictField(),
+                'recent_announcements': serializers.ListField(
+                    child=serializers.DictField()
+                ),
+            },
+        )
+    )
+    def get(self, request):
+        return Response(build_dashboard_report())
 
 
 class RegisterView(APIView):

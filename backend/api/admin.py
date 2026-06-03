@@ -1,4 +1,6 @@
 from django.contrib import admin
+
+from .reports import build_dashboard_report
 from .models import (
     Announcement,
     Attachment,
@@ -14,6 +16,18 @@ from .models import (
 admin.site.site_header = 'Administracao do Projeto Miranda'
 admin.site.site_title = 'Projeto Miranda'
 admin.site.index_title = 'Painel de administracao'
+admin.site.index_template = 'admin/dashboard_index.html'
+
+admin_site_index = admin.site.index
+
+
+def dashboard_index(request, extra_context=None):
+    extra_context = extra_context or {}
+    extra_context['dashboard_report'] = build_dashboard_report()
+    return admin_site_index(request, extra_context=extra_context)
+
+
+admin.site.index = dashboard_index
 
 
 @admin.register(Document)

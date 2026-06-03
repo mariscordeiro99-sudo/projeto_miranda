@@ -10,7 +10,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.test import APITestCase
 
-from .models import Announcement, Attachment, Profile
+from .models import Announcement, Attachment, DeliveryLog, Profile, PushDevice
 from .views import validate_attachment
 
 
@@ -228,3 +228,171 @@ class PublicDataExposureTests(APITestCase):
         self.assertIn('author', response.data)
         self.assertNotIn('email', response.data['author'])
         self.assertNotIn('is_staff', response.data['author'])
+
+
+class DashboardReportTests(APITestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username='admin',
+            email='admin@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=self.staff_user,
+            phone_number='51911111111',
+            role=Profile.ROLE_MANAGER,
+        )
+
+        self.citizen_user = User.objects.create_user(
+            username='cidadao_relatorio',
+            email='cidadao_relatorio@example.com',
+            password='SenhaForte123',
+        )
+        Profile.objects.create(
+            user=self.citizen_user,
+            phone_number='51922222222',
+            role=Profile.ROLE_CITIZEN,
+        )
+
+        self.inactive_user = User.objects.create_user(
+            username='inativo',
+            email='inativo@example.com',
+            password='SenhaForte123',
+            is_active=False,
+        )
+
+        self.published = Announcement.objects.create(
+            author=self.staff_user,
+            title='Comunicado publicado',
+            content='Conteudo publicado',
+            status=Announcement.STATUS_PUBLISHED,
+            pinned=True,
+        )
+        self.draft = Announcement.objects.create(
+            author=self.staff_user,
+            title='Comunicado rascunho',
+            content='Conteudo rascunho',
+            status=Announcement.STATUS_DRAFT,
+        )
+        Announcement.objects.create(
+            author=self.staff_user,
+            title='Comunicado arquivado',
+            content='Conteudo arquivado',
+            status=Announcement.STATUS_ARCHIVED,
+        )
+
+        self.active_device = PushDevice.objects.create(
+            user=self.citizen_user,
+            token='active-web-token',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.inactive_device = PushDevice.objects.create(
+            token='inactive-android-token',
+            platform=PushDevice.PLATFORM_ANDROID,
+            is_active=False,
+        )
+
+        DeliveryLog.objects.create(
+            announcement=self.published,
+            device=self.active_device,
+            recipient_user=self.citizen_user,
+            status=DeliveryLog.STATUS_VIEWED,
+        )
+        DeliveryLog.objects.create(
+            announcement=self.published,
+            device=self.active_device,
+            recipient_user=self.citizen_user,
+            status=DeliveryLog.STATUS_SENT,
+        )
+        DeliveryLog.objects.create(
+            announcement=self.published,
+            device=self.inactive_device,
+            status=DeliveryLog.STATUS_FAILED,
+        )
+        DeliveryLog.objects.create(
+            announcement=self.draft,
+            device=self.active_device,
+            recipient_user=self.citizen_user,
+            status=DeliveryLog.STATUS_PENDING,
+        )
+
+    def authenticate_as(self, user):
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    def test_dashboard_requires_authenticated_admin(self):
+        response = self.client.get('/api/reports/dashboard/')
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_dashboard_rejects_non_admin_user(self):
+        self.authenticate_as(self.citizen_user)
+
+        response = self.client.get('/api/reports/dashboard/')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_dashboard_returns_general_metrics_for_admin(self):
+        self.authenticate_as(self.staff_user)
+
+        response = self.client.get('/api/reports/dashboard/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['users']['total'], 3)
+        self.assertEqual(response.data['users']['active'], 2)
+        self.assertEqual(response.data['users']['staff'], 1)
+        self.assertEqual(response.data['users']['citizens'], 1)
+        self.assertEqual(response.data['users']['managers'], 1)
+        self.assertEqual(response.data['users']['with_active_push_device'], 1)
+
+        self.assertEqual(response.data['announcements']['total'], 3)
+        self.assertEqual(response.data['announcements']['published'], 1)
+        self.assertEqual(response.data['announcements']['draft'], 1)
+        self.assertEqual(response.data['announcements']['archived'], 1)
+        self.assertEqual(response.data['announcements']['pinned'], 1)
+
+        self.assertEqual(response.data['delivery']['total_logs'], 4)
+        self.assertEqual(response.data['delivery']['pending'], 1)
+        self.assertEqual(response.data['delivery']['sent'], 2)
+        self.assertEqual(response.data['delivery']['failed'], 1)
+        self.assertEqual(response.data['delivery']['viewed'], 1)
+        self.assertEqual(response.data['delivery']['view_rate'], 25.0)
+        self.assertEqual(response.data['delivery']['failure_rate'], 25.0)
+
+        self.assertEqual(response.data['devices']['total'], 2)
+        self.assertEqual(response.data['devices']['active'], 1)
+        self.assertEqual(response.data['devices']['inactive'], 1)
+        self.assertEqual(response.data['devices']['anonymous'], 1)
+        self.assertEqual(response.data['devices']['by_platform'][PushDevice.PLATFORM_WEB], 1)
+        self.assertEqual(response.data['devices']['by_platform'][PushDevice.PLATFORM_ANDROID], 1)
+        self.assertEqual(response.data['devices']['by_platform'][PushDevice.PLATFORM_IOS], 0)
+        self.assertLessEqual(len(response.data['recent_announcements']), 5)
+
+
+class AdminDashboardTests(APITestCase):
+    @override_settings(
+        STORAGES={
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        }
+    )
+    def test_admin_index_shows_dashboard_report(self):
+        admin_user = User.objects.create_superuser(
+            username='admin_dashboard',
+            email='admin_dashboard@example.com',
+            password='SenhaForte123',
+        )
+        self.client.force_login(admin_user)
+
+        response = self.client.get('/admin/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'Relatorios gerais')
+        self.assertContains(response, 'usuarios ativos')
+        self.assertContains(response, 'comunicados publicados')
