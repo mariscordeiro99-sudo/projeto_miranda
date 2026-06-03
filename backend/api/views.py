@@ -10,7 +10,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils import timezone
-from rest_framework import parsers, permissions, status, viewsets
+from rest_framework import parsers, permissions, status, throttling, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -110,6 +110,8 @@ class IsManagerOrReadOnly(permissions.BasePermission):
 
 
 class HelloView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def get(self, request):
         return Response({
             'message': 'Olá do backend Django! A comunicação está funcionando.',
@@ -121,6 +123,8 @@ class HelloView(APIView):
 class RegisterView(APIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [throttling.ScopedRateThrottle]
+    throttle_scope = 'auth_register'
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
 
     def post(self, request, *args, **kwargs):
@@ -167,6 +171,15 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        candidate_user = User(username=username, email=email, first_name=first_name)
+        try:
+            validate_password(password, user=candidate_user)
+        except ValidationError as error:
+            return Response(
+                {'detail': list(error.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             with transaction.atomic():
                 user = User(
@@ -206,6 +219,9 @@ class RegisterView(APIView):
 class LoginView(APIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [throttling.ScopedRateThrottle]
+    throttle_scope = 'auth_login'
+
     def post(self, request, *args, **kwargs):
         login_value = request.data.get('username', '').strip()
         password = request.data.get('password', '')
@@ -254,6 +270,8 @@ class LoginView(APIView):
 class PasswordResetRequestView(APIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [throttling.ScopedRateThrottle]
+    throttle_scope = 'password_reset'
 
     def post(self, request, *args, **kwargs):
         identifier = request.data.get('email', '') or request.data.get('username', '')
@@ -293,6 +311,8 @@ class PasswordResetRequestView(APIView):
 class PasswordResetConfirmView(APIView):
     authentication_classes = []
     permission_classes = []
+    throttle_classes = [throttling.ScopedRateThrottle]
+    throttle_scope = 'password_reset'
 
     def post(self, request, *args, **kwargs):
         uid = request.data.get('uid', '')
@@ -478,10 +498,15 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
 
 
 class AttachmentViewSet(viewsets.ModelViewSet):
-    queryset = Attachment.objects.select_related('announcement').all()
     serializer_class = AttachmentSerializer
     permission_classes = [IsManagerOrReadOnly]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+
+    def get_queryset(self):
+        queryset = Attachment.objects.select_related('announcement').all()
+        if self.request.user.is_authenticated and self.request.user.is_staff:
+            return queryset
+        return queryset.filter(announcement__status=Announcement.STATUS_PUBLISHED)
 
     def perform_create(self, serializer):
         uploaded_file = self.request.FILES.get('file')

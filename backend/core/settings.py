@@ -120,8 +120,13 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_THROTTLE_RATES': {
+        'auth_login': os.getenv('AUTH_LOGIN_THROTTLE_RATE', '5/minute'),
+        'auth_register': os.getenv('AUTH_REGISTER_THROTTLE_RATE', '10/hour'),
+        'password_reset': os.getenv('PASSWORD_RESET_THROTTLE_RATE', '5/hour'),
+    },
 }
 
 SPECTACULAR_SETTINGS = {

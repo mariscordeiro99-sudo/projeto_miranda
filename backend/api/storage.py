@@ -1,4 +1,5 @@
 import os
+import uuid
 from pathlib import PurePosixPath
 
 import cloudinary
@@ -44,6 +45,14 @@ def _split_name(name):
     return resource_type, stem, extension.lstrip('.')
 
 
+def _unique_public_id(name, resource_type):
+    path = PurePosixPath(name)
+    suffix = uuid.uuid4().hex
+    if resource_type == 'raw':
+        return str(path.with_name(f'{path.stem}_{suffix}{path.suffix}'))
+    return str(path.with_name(f'{path.stem}_{suffix}'))
+
+
 class CloudinaryMediaStorage(Storage):
     """Django media storage for images, videos and raw files in Cloudinary."""
 
@@ -58,8 +67,7 @@ class CloudinaryMediaStorage(Storage):
     def _save(self, name, content):
         name = _with_base_folder(_clean_path(name))
         resource_type = self._resource_type(content)
-        extension = PurePosixPath(name).suffix
-        public_id = name if resource_type == 'raw' else name.removesuffix(extension)
+        public_id = _unique_public_id(name, resource_type)
 
         if hasattr(content, 'seek'):
             content.seek(0)
@@ -68,7 +76,7 @@ class CloudinaryMediaStorage(Storage):
             content,
             public_id=public_id,
             resource_type=resource_type,
-            overwrite=True,
+            overwrite=False,
             invalidate=True,
             use_filename=False,
             unique_filename=False,

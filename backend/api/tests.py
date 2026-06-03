@@ -6,10 +6,11 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.test import APITestCase
 
-from .models import Profile
+from .models import Announcement, Attachment, Profile
 from .views import validate_attachment
 
 
@@ -75,6 +76,23 @@ class RegisterViewTests(APITestCase):
         self.assertFalse(user.is_staff)
         self.assertEqual(user.profile.role, Profile.ROLE_CITIZEN)
 
+    def test_public_register_rejects_weak_password(self):
+        response = self.client.post(
+            '/auth/register/',
+            {
+                'username': 'senha_fraca',
+                'email': 'senha_fraca@example.com',
+                'password': '123',
+                'first_name': 'Senha Fraca',
+                'phone_number': '51966666666',
+                'is_gestor': 'false',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(username='senha_fraca').exists())
+
     def test_public_register_accepts_profile_picture(self):
         test_storages = {
             'default': {
@@ -135,3 +153,78 @@ class AttachmentValidationTests(APITestCase):
 
         with self.assertRaises(DRFValidationError):
             validate_attachment(uploaded_file)
+
+
+class PublicDataExposureTests(APITestCase):
+    def setUp(self):
+        self.media_root = tempfile.mkdtemp()
+        self.test_storages = {
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        }
+        self.staff_user = User.objects.create_user(
+            username='gestor',
+            email='gestor@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        self.published = Announcement.objects.create(
+            author=self.staff_user,
+            title='Publicado',
+            content='Conteudo publicado',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+        self.draft = Announcement.objects.create(
+            author=self.staff_user,
+            title='Rascunho',
+            content='Conteudo privado',
+            status=Announcement.STATUS_DRAFT,
+        )
+
+    def tearDown(self):
+        rmtree(self.media_root, ignore_errors=True)
+
+    def create_attachment(self, announcement, name):
+        return Attachment.objects.create(
+            announcement=announcement,
+            file=SimpleUploadedFile(name, b'%PDF-1.4\n', content_type='application/pdf'),
+            original_name=name,
+            file_type=Attachment.TYPE_DOCUMENT,
+        )
+
+    def test_public_attachment_list_only_includes_published_announcements(self):
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            published_attachment = self.create_attachment(self.published, 'publico.pdf')
+            draft_attachment = self.create_attachment(self.draft, 'rascunho.pdf')
+
+            response = self.client.get('/api/attachments/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item['id'] for item in response.data}
+        self.assertIn(published_attachment.id, returned_ids)
+        self.assertNotIn(draft_attachment.id, returned_ids)
+
+    def test_staff_attachment_list_includes_draft_announcements(self):
+        token = Token.objects.create(user=self.staff_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            draft_attachment = self.create_attachment(self.draft, 'rascunho.pdf')
+
+            response = self.client.get('/api/attachments/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item['id'] for item in response.data}
+        self.assertIn(draft_attachment.id, returned_ids)
+
+    def test_public_announcement_does_not_expose_author_email_or_staff_flag(self):
+        response = self.client.get(f'/api/announcements/{self.published.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('author', response.data)
+        self.assertNotIn('email', response.data['author'])
+        self.assertNotIn('is_staff', response.data['author'])

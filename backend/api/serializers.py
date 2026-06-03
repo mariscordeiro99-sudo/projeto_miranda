@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from drf_spectacular.utils import extend_schema_field
 
 from .models import (
     Announcement,
@@ -23,6 +24,12 @@ class UserSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'is_staff']
+
+
+class PublicUserSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name']
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -91,7 +98,7 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
-    author = UserSummarySerializer(read_only=True)
+    author = serializers.SerializerMethodField()
     attachments = AttachmentSerializer(many=True, read_only=True)
 
     class Meta:
@@ -110,6 +117,17 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'updated_at',
         ]
         read_only_fields = ['author', 'published_at', 'created_at', 'updated_at']
+
+    @extend_schema_field(PublicUserSummarySerializer)
+    def get_author(self, obj):
+        if not obj.author:
+            return None
+
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated and user.is_staff:
+            return UserSummarySerializer(obj.author, context=self.context).data
+        return PublicUserSummarySerializer(obj.author, context=self.context).data
 
 
 class PushDeviceSerializer(serializers.ModelSerializer):
