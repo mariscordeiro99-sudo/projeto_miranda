@@ -46,6 +46,30 @@
   .miranda-dashboard-table td {
     padding: 8px;
   }
+
+  .miranda-dashboard-section {
+    margin-top: 20px;
+  }
+
+  .miranda-dashboard-columns {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    margin-top: 20px;
+  }
+
+  .miranda-dashboard-panel {
+    min-width: 0;
+  }
+
+  .miranda-dashboard-panel h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+  }
+
+  .miranda-dashboard-muted {
+    color: var(--body-quiet-color);
+  }
 </style>
 {% endblock %}
 
@@ -107,6 +131,88 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <div class="miranda-dashboard-columns">
+    <div class="miranda-dashboard-panel">
+      <h3>Dispositivos ativos</h3>
+      <table class="miranda-dashboard-table">
+        <thead>
+          <tr>
+            <th scope="col">Dispositivo</th>
+            <th scope="col">Usuario</th>
+            <th scope="col">Token</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for device in dashboard_report.active_devices %}
+          <tr>
+            <td>{{ device.platform }} #{{ device.id }}</td>
+            <td>{{ device.user }}</td>
+            <td class="miranda-dashboard-muted">{{ device.token_preview }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3">Nenhum dispositivo ativo.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="miranda-dashboard-panel">
+      <h3>Ultimas 3 falhas de envio</h3>
+      <table class="miranda-dashboard-table">
+        <thead>
+          <tr>
+            <th scope="col">Comunicado</th>
+            <th scope="col">Dispositivo</th>
+            <th scope="col">Erro</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for failure in dashboard_report.recent_failures %}
+          <tr>
+            <td>{{ failure.announcement }}</td>
+            <td>{{ failure.device }}</td>
+            <td class="miranda-dashboard-muted">{{ failure.error_message }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3">Nenhuma falha registrada.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="miranda-dashboard-section">
+    <h3>Ultimas visualizacoes</h3>
+    <table class="miranda-dashboard-table">
+      <thead>
+        <tr>
+          <th scope="col">Usuario</th>
+          <th scope="col">Comunicado</th>
+          <th scope="col">Dispositivo</th>
+          <th scope="col">Visualizado em</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for view in dashboard_report.recent_views %}
+        <tr>
+          <td>{{ view.recipient }}</td>
+          <td>{{ view.announcement }}</td>
+          <td>{{ view.device }}</td>
+          <td>{{ view.viewed_at|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4">Nenhuma visualizacao registrada.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 {% endif %}
 {{ block.super }}

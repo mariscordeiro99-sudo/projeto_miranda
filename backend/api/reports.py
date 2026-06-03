@@ -26,6 +26,9 @@ def build_dashboard_report():
         },
         'devices': build_device_metrics(),
         'recent_announcements': build_recent_announcement_metrics(),
+        'active_devices': build_active_device_details(),
+        'recent_failures': build_recent_failure_details(),
+        'recent_views': build_recent_view_details(),
     }
 
 
@@ -121,6 +124,100 @@ def build_recent_announcement_metrics():
         }
         for announcement in announcements
     ]
+
+
+def build_active_device_details(limit=5):
+    devices = (
+        PushDevice.objects
+        .filter(is_active=True)
+        .select_related('user')
+        .order_by('-updated_at')[:limit]
+    )
+
+    return [
+        {
+            'id': device.id,
+            'platform': device.platform,
+            'user': user_label(device.user),
+            'token_preview': token_preview(device.token),
+            'updated_at': device.updated_at,
+        }
+        for device in devices
+    ]
+
+
+def build_recent_failure_details(limit=3):
+    logs = (
+        DeliveryLog.objects
+        .filter(status=DeliveryLog.STATUS_FAILED)
+        .select_related('announcement', 'device', 'recipient_user')
+        .order_by('-created_at')[:limit]
+    )
+
+    return [
+        {
+            'id': log.id,
+            'announcement': announcement_label(log.announcement),
+            'device': device_label(log.device),
+            'recipient': user_label(log.recipient_user),
+            'error_message': truncate(log.error_message, 160),
+            'created_at': log.created_at,
+        }
+        for log in logs
+    ]
+
+
+def build_recent_view_details(limit=5):
+    logs = (
+        DeliveryLog.objects
+        .filter(status=DeliveryLog.STATUS_VIEWED)
+        .select_related('announcement', 'device', 'recipient_user')
+        .order_by('-viewed_at', '-created_at')[:limit]
+    )
+
+    return [
+        {
+            'id': log.id,
+            'announcement': announcement_label(log.announcement),
+            'device': device_label(log.device),
+            'recipient': user_label(log.recipient_user),
+            'viewed_at': log.viewed_at,
+        }
+        for log in logs
+    ]
+
+
+def announcement_label(announcement):
+    if not announcement:
+        return 'Sem comunicado'
+    return announcement.title
+
+
+def device_label(device):
+    if not device:
+        return 'Sem dispositivo'
+    return f'{device.platform} #{device.id}'
+
+
+def user_label(user):
+    if not user:
+        return 'Sem usuario'
+    return user.get_full_name() or user.username
+
+
+def token_preview(token):
+    if not token:
+        return ''
+    if len(token) <= 12:
+        return token
+    return f'{token[:12]}...'
+
+
+def truncate(value, max_length):
+    value = value or ''
+    if len(value) <= max_length:
+        return value
+    return f'{value[:max_length - 3]}...'
 
 
 def percentage(numerator, denominator):

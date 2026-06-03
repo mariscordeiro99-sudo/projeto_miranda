@@ -5,6 +5,7 @@ from shutil import rmtree
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -299,6 +300,7 @@ class DashboardReportTests(APITestCase):
             device=self.active_device,
             recipient_user=self.citizen_user,
             status=DeliveryLog.STATUS_VIEWED,
+            viewed_at=timezone.now(),
         )
         DeliveryLog.objects.create(
             announcement=self.published,
@@ -310,6 +312,7 @@ class DashboardReportTests(APITestCase):
             announcement=self.published,
             device=self.inactive_device,
             status=DeliveryLog.STATUS_FAILED,
+            error_message='Provider returned invalid token while sending notification.',
         )
         DeliveryLog.objects.create(
             announcement=self.draft,
@@ -370,6 +373,26 @@ class DashboardReportTests(APITestCase):
         self.assertEqual(response.data['devices']['by_platform'][PushDevice.PLATFORM_IOS], 0)
         self.assertLessEqual(len(response.data['recent_announcements']), 5)
 
+        self.assertEqual(len(response.data['active_devices']), 1)
+        self.assertEqual(response.data['active_devices'][0]['platform'], PushDevice.PLATFORM_WEB)
+        self.assertEqual(response.data['active_devices'][0]['user'], 'cidadao_relatorio')
+        self.assertTrue(response.data['active_devices'][0]['token_preview'].endswith('...'))
+        self.assertNotEqual(
+            response.data['active_devices'][0]['token_preview'],
+            self.active_device.token,
+        )
+
+        self.assertEqual(len(response.data['recent_failures']), 1)
+        self.assertEqual(
+            response.data['recent_failures'][0]['announcement'],
+            self.published.title,
+        )
+        self.assertIn('invalid token', response.data['recent_failures'][0]['error_message'])
+
+        self.assertEqual(len(response.data['recent_views']), 1)
+        self.assertEqual(response.data['recent_views'][0]['recipient'], 'cidadao_relatorio')
+        self.assertEqual(response.data['recent_views'][0]['announcement'], self.published.title)
+
 
 class AdminDashboardTests(APITestCase):
     @override_settings(
@@ -396,3 +419,6 @@ class AdminDashboardTests(APITestCase):
         self.assertContains(response, 'Relatorios gerais')
         self.assertContains(response, 'usuarios ativos')
         self.assertContains(response, 'comunicados publicados')
+        self.assertContains(response, 'Dispositivos ativos')
+        self.assertContains(response, 'Ultimas 3 falhas de envio')
+        self.assertContains(response, 'Ultimas visualizacoes')
