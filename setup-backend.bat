@@ -24,6 +24,7 @@ echo.
 echo Backend preparado.
 echo Iniciando o servidor Django...
 echo Quando quiser parar o servidor, pressione Ctrl+C.
+REM Comando manual para iniciar o backend: python manage.py runserver
 echo.
 python manage.py runserver
 

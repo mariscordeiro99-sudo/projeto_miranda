@@ -4,393 +4,47 @@
 {{ block.super }}
 <style>
   .miranda-dashboard {
-    --miranda-bg: #f7f9fb;
-    --miranda-card: #ffffff;
-    --miranda-text: #191c1e;
-    --miranda-muted: #555463;
-    --miranda-border: #c8c4d5;
-    --miranda-primary: #1f108e;
-    --miranda-secondary: #4648d4;
-    --miranda-soft-primary: #e8e6ff;
-    --miranda-error: #ba1a1a;
-    --miranda-error-bg: #fff1f0;
-    --miranda-success: #22c55e;
-    background: var(--miranda-bg);
-    border-radius: 14px;
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-    color: var(--miranda-text);
-    margin: 0 0 28px;
-    max-width: 760px;
-    padding: 26px 28px 30px;
+    margin: 0 0 24px;
   }
 
-  .miranda-dashboard * {
-    box-sizing: border-box;
-  }
-
-  .miranda-dashboard-header {
-    align-items: center;
-    display: flex;
-    gap: 16px;
-    justify-content: space-between;
-    margin-bottom: 24px;
-  }
-
-  .miranda-dashboard-title {
-    align-items: center;
-    color: var(--miranda-primary);
-    display: flex;
-    font-size: 1.65rem;
-    font-weight: 800;
-    gap: 14px;
-    letter-spacing: 0;
-    margin: 0;
-  }
-
-  .miranda-dashboard-menu {
-    color: var(--miranda-primary);
-    display: inline-grid;
-    font-size: 1.6rem;
-    line-height: 1;
-    place-items: center;
-  }
-
-  .miranda-dashboard-avatar {
-    align-items: center;
-    background: var(--miranda-soft-primary);
-    border: 2px solid var(--miranda-border);
-    border-radius: 999px;
-    color: var(--miranda-primary);
-    display: inline-flex;
-    font-weight: 800;
-    height: 42px;
-    justify-content: center;
-    width: 42px;
+  .miranda-dashboard h2 {
+    margin: 0 0 12px;
+    font-size: 1.25rem;
   }
 
   .miranda-dashboard-grid {
     display: grid;
-    gap: 18px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-bottom: 28px;
-  }
-
-  .miranda-stat-card,
-  .miranda-announcement-card,
-  .miranda-devices-card,
-  .miranda-failures-card,
-  .miranda-views-card {
-    background: var(--miranda-card);
-    border: 1px solid var(--miranda-border);
-    border-radius: 16px;
-    box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
-  }
-
-  .miranda-stat-card {
-    min-height: 138px;
-    padding: 20px;
-  }
-
-  .miranda-stat-icon {
-    align-items: center;
-    background: var(--miranda-soft-primary);
-    border-radius: 10px;
-    color: var(--miranda-primary);
-    display: inline-flex;
-    font-size: 0.9rem;
-    font-weight: 900;
-    height: 36px;
-    justify-content: center;
-    margin-bottom: 12px;
-    width: 36px;
-  }
-
-  .miranda-stat-icon-muted {
-    background: #eef0f4;
-    color: #343847;
-  }
-
-  .miranda-stat-icon-error {
-    background: #ffe3e0;
-    color: var(--miranda-error);
-  }
-
-  .miranda-stat-label {
-    color: var(--miranda-muted);
-    display: block;
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0;
-    line-height: 1.35;
-    margin-bottom: 8px;
-  }
-
-  .miranda-stat-value {
-    color: var(--miranda-primary);
-    display: block;
-    font-size: 1.65rem;
-    font-weight: 900;
-    line-height: 1.1;
-  }
-
-  .miranda-stat-value-dark {
-    color: #242c40;
-  }
-
-  .miranda-stat-value-error {
-    color: var(--miranda-error);
-  }
-
-  .miranda-section-header {
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
-    margin: 0 0 14px;
-  }
-
-  .miranda-section-title {
-    color: var(--miranda-text);
-    font-size: 1.45rem;
-    font-weight: 900;
-    letter-spacing: 0;
-    margin: 0;
-  }
-
-  .miranda-section-link {
-    color: var(--miranda-primary);
-    font-size: 0.9rem;
-    font-weight: 800;
-    text-decoration: none;
-  }
-
-  .miranda-announcement-list {
-    display: grid;
-    gap: 14px;
-    margin-bottom: 30px;
-  }
-
-  .miranda-announcement-card {
-    padding: 18px 20px;
-  }
-
-  .miranda-announcement-top {
-    align-items: start;
-    display: flex;
     gap: 12px;
-    justify-content: space-between;
-    margin-bottom: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
 
-  .miranda-announcement-title {
-    color: var(--miranda-text);
-    font-size: 1.05rem;
-    font-weight: 900;
-    line-height: 1.35;
-    margin: 0;
+  .miranda-dashboard-card {
+    background: var(--darkened-bg);
+    border: 1px solid var(--hairline-color);
+    border-radius: 4px;
+    padding: 14px;
   }
 
-  .miranda-badge {
-    background: var(--miranda-soft-primary);
-    border-radius: 999px;
-    color: var(--miranda-secondary);
-    display: inline-block;
-    font-size: 0.72rem;
-    font-weight: 900;
-    line-height: 1;
-    padding: 8px 10px;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .miranda-announcement-meta {
-    color: var(--miranda-muted);
-    display: flex;
-    flex-wrap: wrap;
-    font-size: 0.92rem;
-    font-weight: 700;
-    gap: 16px;
-  }
-
-  .miranda-devices-card,
-  .miranda-failures-card,
-  .miranda-views-card {
-    margin-bottom: 30px;
-    padding: 24px;
-  }
-
-  .miranda-card-title {
-    align-items: center;
-    color: var(--miranda-text);
-    display: flex;
-    font-size: 1.35rem;
-    font-weight: 900;
-    gap: 10px;
-    margin: 0 0 20px;
-  }
-
-  .miranda-dot {
-    background: var(--miranda-success);
-    border-radius: 999px;
-    display: inline-block;
-    height: 10px;
-    width: 10px;
-  }
-
-  .miranda-device-row {
-    align-items: center;
-    display: grid;
-    gap: 16px;
-    grid-template-columns: 42px 1fr auto;
-    padding: 14px 0;
-  }
-
-  .miranda-device-row + .miranda-device-row {
-    border-top: 1px solid var(--miranda-border);
-  }
-
-  .miranda-device-icon {
-    align-items: center;
-    border: 2px solid var(--miranda-muted);
-    border-radius: 8px;
-    color: var(--miranda-muted);
-    display: inline-flex;
-    font-size: 0.78rem;
-    font-weight: 900;
-    height: 30px;
-    justify-content: center;
-    width: 30px;
-  }
-
-  .miranda-device-name,
-  .miranda-view-name {
-    color: var(--miranda-text);
+  .miranda-dashboard-card strong {
     display: block;
-    font-size: 1.05rem;
-    font-weight: 900;
-    line-height: 1.3;
+    color: var(--body-fg);
+    font-size: 1.5rem;
+    line-height: 1.2;
+    margin-bottom: 4px;
   }
 
-  .miranda-device-subtitle,
-  .miranda-view-subtitle {
-    color: var(--miranda-muted);
-    display: block;
-    font-size: 0.86rem;
-    font-weight: 700;
-    line-height: 1.3;
+  .miranda-dashboard-card span {
+    color: var(--body-quiet-color);
   }
 
-  .miranda-device-count {
-    color: var(--miranda-text);
-    font-size: 1.08rem;
-    font-weight: 900;
+  .miranda-dashboard-table {
+    margin-top: 16px;
+    width: 100%;
   }
 
-  .miranda-failures-card {
-    background: var(--miranda-error-bg);
-    border-color: #f3bbb7;
-  }
-
-  .miranda-failures-card .miranda-card-title {
-    color: var(--miranda-error);
-  }
-
-  .miranda-failure-list {
-    display: grid;
-    gap: 14px;
-    margin: 0;
-    padding: 0;
-  }
-
-  .miranda-failure-item {
-    align-items: start;
-    display: grid;
-    gap: 12px;
-    grid-template-columns: 1fr auto;
-    list-style: none;
-  }
-
-  .miranda-failure-title {
-    color: #93000a;
-    font-size: 0.96rem;
-    font-weight: 700;
-    line-height: 1.35;
-  }
-
-  .miranda-failure-chip {
-    color: var(--miranda-error);
-    font-size: 0.8rem;
-    font-weight: 900;
-    text-align: right;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .miranda-views-card {
-    padding: 0;
-  }
-
-  .miranda-view-row {
-    align-items: center;
-    display: grid;
-    gap: 14px;
-    grid-template-columns: 48px 1fr auto;
-    padding: 16px 18px;
-  }
-
-  .miranda-view-row + .miranda-view-row {
-    border-top: 1px solid var(--miranda-border);
-  }
-
-  .miranda-view-avatar {
-    align-items: center;
-    background: #e1e0ff;
-    border-radius: 999px;
-    color: var(--miranda-primary);
-    display: inline-flex;
-    font-size: 0.82rem;
-    font-weight: 900;
-    height: 42px;
-    justify-content: center;
-    width: 42px;
-  }
-
-  .miranda-view-time {
-    color: #777584;
-    font-size: 0.88rem;
-    font-weight: 800;
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  .miranda-empty {
-    color: var(--miranda-muted);
-    font-weight: 700;
-    margin: 0;
-  }
-
-  @media (max-width: 760px) {
-    .miranda-dashboard {
-      border-radius: 0;
-      margin-left: -20px;
-      margin-right: -20px;
-      padding: 22px 20px 28px;
-    }
-
-    .miranda-dashboard-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 520px) {
-    .miranda-dashboard-grid,
-    .miranda-failure-item,
-    .miranda-view-row {
-      grid-template-columns: 1fr;
-    }
-
-    .miranda-view-time {
-      text-align: left;
-    }
+  .miranda-dashboard-table th,
+  .miranda-dashboard-table td {
+    padding: 8px;
   }
 </style>
 {% endblock %}
@@ -398,124 +52,61 @@
 {% block content %}
 {% if dashboard_report %}
 <section class="miranda-dashboard">
-  <header class="miranda-dashboard-header">
-    <h2 class="miranda-dashboard-title">
-      <span class="miranda-dashboard-menu">=</span>
-      Relatorios gerais
-    </h2>
-    <span class="miranda-dashboard-avatar">{{ request.user.username|slice:":2"|upper }}</span>
-  </header>
-
+  <h2>Relatorios gerais</h2>
   <div class="miranda-dashboard-grid">
-    <article class="miranda-stat-card">
-      <span class="miranda-stat-icon">US</span>
-      <span class="miranda-stat-label">Usuarios ativos</span>
-      <strong class="miranda-stat-value">{{ dashboard_report.users.active }}</strong>
-    </article>
-    <article class="miranda-stat-card">
-      <span class="miranda-stat-icon">CM</span>
-      <span class="miranda-stat-label">Comunicados</span>
-      <strong class="miranda-stat-value">{{ dashboard_report.announcements.published }}</strong>
-    </article>
-    <article class="miranda-stat-card">
-      <span class="miranda-stat-icon miranda-stat-icon-muted">DV</span>
-      <span class="miranda-stat-label">Dispositivos</span>
-      <strong class="miranda-stat-value miranda-stat-value-dark">{{ dashboard_report.devices.active }}</strong>
-    </article>
-    <article class="miranda-stat-card">
-      <span class="miranda-stat-icon miranda-stat-icon-error">!</span>
-      <span class="miranda-stat-label">Falhas</span>
-      <strong class="miranda-stat-value miranda-stat-value-error">{{ dashboard_report.delivery.failed }}</strong>
-    </article>
+    <div class="miranda-dashboard-card">
+      <strong>{{ dashboard_report.users.active }}</strong>
+      <span>usuarios ativos</span>
+    </div>
+    <div class="miranda-dashboard-card">
+      <strong>{{ dashboard_report.announcements.published }}</strong>
+      <span>comunicados publicados</span>
+    </div>
+    <div class="miranda-dashboard-card">
+      <strong>{{ dashboard_report.delivery.sent }}</strong>
+      <span>entregas enviadas</span>
+    </div>
+    <div class="miranda-dashboard-card">
+      <strong>{{ dashboard_report.delivery.view_rate }}%</strong>
+      <span>taxa de visualizacao</span>
+    </div>
+    <div class="miranda-dashboard-card">
+      <strong>{{ dashboard_report.devices.active }}</strong>
+      <span>dispositivos ativos</span>
+    </div>
+    <div class="miranda-dashboard-card">
+      <strong>{{ dashboard_report.delivery.failed }}</strong>
+      <span>falhas de envio</span>
+    </div>
   </div>
 
-  <section class="miranda-section">
-    <div class="miranda-section-header">
-      <h3 class="miranda-section-title">Comunicados recentes</h3>
-      <a class="miranda-section-link" href="{% url 'admin:api_announcement_changelist' %}">Ver todos &gt;</a>
-    </div>
-    <div class="miranda-announcement-list">
+  <table class="miranda-dashboard-table">
+    <caption>Comunicados recentes</caption>
+    <thead>
+      <tr>
+        <th scope="col">Titulo</th>
+        <th scope="col">Status</th>
+        <th scope="col">Entregas</th>
+        <th scope="col">Visualizacoes</th>
+        <th scope="col">Taxa</th>
+      </tr>
+    </thead>
+    <tbody>
       {% for announcement in dashboard_report.recent_announcements %}
-      <article class="miranda-announcement-card">
-        <div class="miranda-announcement-top">
-          <h4 class="miranda-announcement-title">{{ announcement.title }}</h4>
-          <span class="miranda-badge">{{ announcement.status }}</span>
-        </div>
-        <div class="miranda-announcement-meta">
-          <span>{{ announcement.delivery_total }} envios</span>
-          <span>{{ announcement.viewed }} visualizacoes</span>
-          <span>{{ announcement.view_rate }}% taxa</span>
-        </div>
-      </article>
+      <tr>
+        <td>{{ announcement.title }}</td>
+        <td>{{ announcement.status }}</td>
+        <td>{{ announcement.delivery_total }}</td>
+        <td>{{ announcement.viewed }}</td>
+        <td>{{ announcement.view_rate }}%</td>
+      </tr>
       {% empty %}
-      <article class="miranda-announcement-card">
-        <p class="miranda-empty">Nenhum comunicado registrado.</p>
-      </article>
+      <tr>
+        <td colspan="5">Nenhum comunicado registrado.</td>
+      </tr>
       {% endfor %}
-    </div>
-  </section>
-
-  <section class="miranda-devices-card">
-    <h3 class="miranda-card-title"><span class="miranda-dot"></span>Dispositivos ativos</h3>
-    <div class="miranda-device-row">
-      <span class="miranda-device-icon">M</span>
-      <span>
-        <strong class="miranda-device-name">Mobile Apps</strong>
-        <span class="miranda-device-subtitle">Android e iOS</span>
-      </span>
-      <strong class="miranda-device-count">{{ dashboard_report.devices.active_mobile }}</strong>
-    </div>
-    <div class="miranda-device-row">
-      <span class="miranda-device-icon">W</span>
-      <span>
-        <strong class="miranda-device-name">Desktop Web</strong>
-        <span class="miranda-device-subtitle">Browsers</span>
-      </span>
-      <strong class="miranda-device-count">{{ dashboard_report.devices.active_web }}</strong>
-    </div>
-  </section>
-
-  <section class="miranda-failures-card">
-    <h3 class="miranda-card-title">Falhas de envio</h3>
-    <ul class="miranda-failure-list">
-      {% for failure in dashboard_report.recent_failures %}
-      <li class="miranda-failure-item">
-        <span class="miranda-failure-title">{{ failure.error_message }}</span>
-        <span class="miranda-failure-chip">{{ failure.device }}</span>
-      </li>
-      {% empty %}
-      <li class="miranda-failure-item">
-        <span class="miranda-failure-title">Nenhuma falha registrada.</span>
-        <span class="miranda-failure-chip">OK</span>
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-
-  <section class="miranda-section">
-    <h3 class="miranda-section-title">Visualizacoes recentes</h3>
-    <div class="miranda-views-card">
-      {% for view in dashboard_report.recent_views %}
-      <div class="miranda-view-row">
-        <span class="miranda-view-avatar">{{ view.recipient_initials }}</span>
-        <span>
-          <strong class="miranda-view-name">{{ view.recipient }}</strong>
-          <span class="miranda-view-subtitle">{{ view.announcement }}</span>
-        </span>
-        <span class="miranda-view-time">{{ view.viewed_at|timesince }} atras</span>
-      </div>
-      {% empty %}
-      <div class="miranda-view-row">
-        <span class="miranda-view-avatar">--</span>
-        <span>
-          <strong class="miranda-view-name">Sem visualizacoes</strong>
-          <span class="miranda-view-subtitle">Nenhum comunicado visualizado ainda.</span>
-        </span>
-        <span class="miranda-view-time">-</span>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
+    </tbody>
+  </table>
 </section>
 {% endif %}
 {{ block.super }}

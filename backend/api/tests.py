@@ -394,31 +394,79 @@ class DashboardReportTests(APITestCase):
         self.assertEqual(response.data['recent_views'][0]['announcement'], self.published.title)
 
 
+@override_settings(
+    STORAGES={
+        'default': {
+            'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        },
+        'staticfiles': {
+            'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+        },
+    }
+)
 class AdminDashboardTests(APITestCase):
-    @override_settings(
-        STORAGES={
-            'default': {
-                'BACKEND': 'django.core.files.storage.FileSystemStorage',
-            },
-            'staticfiles': {
-                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
-            },
-        }
-    )
-    def test_admin_index_shows_dashboard_report(self):
-        admin_user = User.objects.create_superuser(
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
             username='admin_dashboard',
             email='admin_dashboard@example.com',
             password='SenhaForte123',
         )
-        self.client.force_login(admin_user)
+        self.citizen_user = User.objects.create_user(
+            username='admin_report_citizen',
+            email='admin_report_citizen@example.com',
+            password='SenhaForte123',
+        )
+        self.announcement = Announcement.objects.create(
+            author=self.admin_user,
+            title='Relatorio publicado',
+            content='Conteudo publicado',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+        self.device = PushDevice.objects.create(
+            user=self.citizen_user,
+            token='admin-report-device-token',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.failed_log = DeliveryLog.objects.create(
+            announcement=self.announcement,
+            device=self.device,
+            recipient_user=self.citizen_user,
+            status=DeliveryLog.STATUS_FAILED,
+            error_message='Falha de envio para teste',
+        )
+
+    def test_admin_index_shows_dashboard_report(self):
+        self.client.force_login(self.admin_user)
 
         response = self.client.get('/admin/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertContains(response, 'Relatorios gerais')
-        self.assertContains(response, 'Usuarios ativos')
-        self.assertContains(response, 'Comunicados')
-        self.assertContains(response, 'Dispositivos ativos')
-        self.assertContains(response, 'Falhas de envio')
-        self.assertContains(response, 'Visualizacoes recentes')
+        self.assertContains(response, 'usuarios ativos')
+        self.assertContains(response, 'comunicados publicados')
+        self.assertContains(response, 'dispositivos ativos')
+        self.assertContains(response, 'falhas de envio')
+        self.assertContains(response, 'Ações recentes')
+        self.assertContains(response, 'entregas enviadas')
+        self.assertContains(response, 'taxa de visualizacao')
+
+    def test_admin_report_detail_pages_are_custom_and_staff_only(self):
+        urls = [
+            ('/admin/reports/users-active/', 'Usuarios ativos'),
+            ('/admin/reports/announcements-published/', 'Comunicados publicados'),
+            ('/admin/reports/devices-active/', 'Dispositivos ativos'),
+            ('/admin/reports/delivery-failures/', 'Falhas de envio'),
+        ]
+
+        for url, _ in urls:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+
+        self.client.force_login(self.admin_user)
+
+        for url, title in urls:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            self.assertContains(response, title)
+            self.assertContains(response, 'Voltar para relatorios')

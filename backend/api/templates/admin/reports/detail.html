@@ -1,0 +1,222 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  body {
+    background: #0b141c;
+  }
+
+  #content {
+    box-sizing: border-box;
+    max-width: none;
+    padding: 0;
+    width: 100%;
+  }
+
+  #content > h1 {
+    display: none;
+  }
+
+  .miranda-report-page {
+    --bg: #0b141c;
+    --surface: #101820;
+    --surface-high: #182028;
+    --border: #4b4454;
+    --text: #dae3ee;
+    --muted: #cdc2d7;
+    --primary: #d6baff;
+    --green: #4edea3;
+    --error: #ffb4ab;
+    background: var(--bg);
+    color: var(--text);
+    min-height: calc(100dvh - 80px);
+    padding: 28px;
+  }
+
+  .miranda-report-shell {
+    margin: 0 auto;
+    max-width: 1120px;
+  }
+
+  .miranda-report-header {
+    align-items: center;
+    display: flex;
+    gap: 18px;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .miranda-report-title {
+    margin: 0;
+  }
+
+  .miranda-report-title span {
+    color: var(--primary);
+    display: block;
+    font-family: monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .miranda-report-title strong {
+    color: var(--text);
+    display: block;
+    font-size: 1.8rem;
+    line-height: 1.2;
+  }
+
+  .miranda-report-back {
+    background: var(--surface-high);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--primary);
+    font-weight: 800;
+    padding: 10px 14px;
+    text-decoration: none;
+  }
+
+  .miranda-report-summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 18px;
+    padding: 22px;
+  }
+
+  .miranda-report-summary span {
+    color: var(--muted);
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .miranda-report-summary strong {
+    color: var(--error);
+    display: block;
+    font-size: 3rem;
+    line-height: 1;
+  }
+
+  .miranda-report-summary:not(.danger) strong {
+    color: var(--text);
+  }
+
+  .miranda-report-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .miranda-report-row {
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    display: grid;
+    gap: 16px;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+    padding: 16px 18px;
+    text-decoration: none;
+  }
+
+  .miranda-report-row:hover {
+    border-color: var(--primary);
+    color: var(--text);
+  }
+
+  .miranda-report-primary {
+    display: block;
+    font-size: 1rem;
+    font-weight: 900;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .miranda-report-secondary,
+  .miranda-report-meta {
+    color: var(--muted);
+    display: block;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .miranda-report-status {
+    background: rgba(78, 222, 163, 0.12);
+    border-radius: 999px;
+    color: var(--green);
+    font-family: monospace;
+    font-size: 0.78rem;
+    font-weight: 900;
+    padding: 8px 10px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .danger .miranda-report-status {
+    background: rgba(255, 180, 171, 0.12);
+    color: var(--error);
+  }
+
+  .miranda-report-empty {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--muted);
+    font-weight: 800;
+    padding: 18px;
+  }
+
+  @media (max-width: 720px) {
+    .miranda-report-page {
+      padding: 18px;
+    }
+
+    .miranda-report-header,
+    .miranda-report-row {
+      grid-template-columns: 1fr;
+    }
+
+    .miranda-report-header {
+      align-items: stretch;
+      flex-direction: column;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="miranda-report-page">
+  <div class="miranda-report-shell">
+    <header class="miranda-report-header">
+      <h1 class="miranda-report-title">
+        <span>{{ eyebrow }}</span>
+        <strong>{{ title }}</strong>
+      </h1>
+      <a class="miranda-report-back" href="{{ dashboard_url }}">Voltar para relatorios</a>
+    </header>
+
+    <section class="miranda-report-summary{% if danger %} danger{% endif %}">
+      <span>Total encontrado</span>
+      <strong>{{ count }}</strong>
+    </section>
+
+    <section class="miranda-report-list{% if danger %} danger{% endif %}">
+      {% for row in rows %}
+      <a class="miranda-report-row" href="{{ row.url }}">
+        <span>
+          <strong class="miranda-report-primary">{{ row.primary }}</strong>
+          <span class="miranda-report-secondary">{{ row.secondary }}</span>
+        </span>
+        <span class="miranda-report-meta">{{ row.meta }}</span>
+        <span class="miranda-report-status">{{ row.status }}</span>
+      </a>
+      {% empty %}
+      <div class="miranda-report-empty">{{ empty_message }}</div>
+      {% endfor %}
+    </section>
+  </div>
+</main>
+{% endblock %}

@@ -21,10 +21,15 @@ from django.shortcuts import redirect
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from api import admin_report_views
 from api.views import HelloView
 
 urlpatterns = [
     path('', lambda request: redirect('admin/')), 
+    path('admin/reports/users-active/', admin_report_views.active_users_report, name='admin-report-users-active'),
+    path('admin/reports/announcements-published/', admin_report_views.published_announcements_report, name='admin-report-announcements-published'),
+    path('admin/reports/devices-active/', admin_report_views.active_devices_report, name='admin-report-devices-active'),
+    path('admin/reports/delivery-failures/', admin_report_views.failed_deliveries_report, name='admin-report-delivery-failures'),
     path('admin/', admin.site.urls),
     path('auth/', include('api.auth_urls')),
     path('health/', HelloView.as_view(), name='health'),
