@@ -23,6 +23,12 @@ echo ""
 echo "=== Running migrations ==="
 python manage.py migrate
 
+if [ -n "$DJANGO_SUPERUSER_USERNAME" ] || [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
+    echo ""
+    echo "=== Creating/updating Django admin user ==="
+    python manage.py upsert_admin
+fi
+
 echo ""
 echo "=== Collecting static files ==="
 python manage.py collectstatic --noinput
