@@ -45,13 +45,13 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, userRole, permissi
               )}
 
               {canSee('controleAcessos') && (
-                <Link to="/acessos" className="menu-link" onClick={onClose}>
+                <Link to="/controle-acesso" className="menu-link" onClick={onClose}>
                   <ShieldCheck size={20} /> Controle de Acessos
                 </Link>
               )}
 
               {canSee('editorComunicados') && (
-                <Link to="/editor" className="menu-link" onClick={onClose}>
+                <Link to="/edicao-comunicados" className="menu-link" onClick={onClose}>
                   <FileEdit size={20} /> Editor de Comunicados
                 </Link>
               )}
