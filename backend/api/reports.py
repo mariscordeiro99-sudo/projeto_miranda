@@ -70,6 +70,19 @@ def build_device_metrics():
         row['platform']: row['total']
         for row in PushDevice.objects.values('platform').annotate(total=Count('id'))
     })
+    active_platform_counts = {
+        platform: 0
+        for platform, _ in PushDevice.PLATFORM_CHOICES
+    }
+    active_platform_counts.update({
+        row['platform']: row['total']
+        for row in (
+            PushDevice.objects
+            .filter(is_active=True)
+            .values('platform')
+            .annotate(total=Count('id'))
+        )
+    })
 
     return {
         'total': PushDevice.objects.count(),
@@ -77,6 +90,11 @@ def build_device_metrics():
         'inactive': PushDevice.objects.filter(is_active=False).count(),
         'anonymous': PushDevice.objects.filter(user_id__isnull=True).count(),
         'by_platform': platform_counts,
+        'active_mobile': (
+            active_platform_counts[PushDevice.PLATFORM_ANDROID]
+            + active_platform_counts[PushDevice.PLATFORM_IOS]
+        ),
+        'active_web': active_platform_counts[PushDevice.PLATFORM_WEB],
     }
 
 
@@ -181,6 +199,7 @@ def build_recent_view_details(limit=5):
             'announcement': announcement_label(log.announcement),
             'device': device_label(log.device),
             'recipient': user_label(log.recipient_user),
+            'recipient_initials': user_initials(log.recipient_user),
             'viewed_at': log.viewed_at,
         }
         for log in logs
@@ -203,6 +222,15 @@ def user_label(user):
     if not user:
         return 'Sem usuario'
     return user.get_full_name() or user.username
+
+
+def user_initials(user):
+    if not user:
+        return '--'
+
+    names = (user.get_full_name() or user.username).split()
+    initials = ''.join(name[:1].upper() for name in names[:2])
+    return initials or '--'
 
 
 def token_preview(token):

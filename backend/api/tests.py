@@ -417,8 +417,8 @@ class AdminDashboardTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertContains(response, 'Relatorios gerais')
-        self.assertContains(response, 'usuarios ativos')
-        self.assertContains(response, 'comunicados publicados')
+        self.assertContains(response, 'Usuarios ativos')
+        self.assertContains(response, 'Comunicados')
         self.assertContains(response, 'Dispositivos ativos')
-        self.assertContains(response, 'Ultimas 3 falhas de envio')
-        self.assertContains(response, 'Ultimas visualizacoes')
+        self.assertContains(response, 'Falhas de envio')
+        self.assertContains(response, 'Visualizacoes recentes')
