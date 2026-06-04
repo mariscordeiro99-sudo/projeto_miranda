@@ -1,7 +1,7 @@
 export interface PermissoesUsuario {
-  permissaoA: boolean;
-  permissaoB: boolean;
-  permissaoC: boolean;
+  controlAcess: boolean;
+  announcement: boolean;
+  idtVisual: boolean;
   isAdmin: boolean;
 }
 

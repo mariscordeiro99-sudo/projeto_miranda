@@ -39,9 +39,9 @@ export const AccessControlPage: React.FC = () => {
                             <thead>
                                 <tr>
                                     <th>Colaborador</th>
-                                    <th className="text-center">Caixa Permissão A</th>
-                                    <th className="text-center">Caixa Permissão B</th>
-                                    <th className="text-center">Caixa Permissão C</th>
+                                    <th className="text-center">Controle de Acesso</th>
+                                    <th className="text-center">Edição de Anúncios</th>
+                                    <th className="text-center">Identificação Visual</th>
                                     <th className="text-center">Administrador (Total)</th>
                                     <th className="text-right">Ação</th>
                                 </tr>
@@ -65,40 +65,37 @@ export const AccessControlPage: React.FC = () => {
                                             </div>
                                         </td>
 
-                                        {/* Caixa A */}
                                         <td className="text-center">
                                             <label className="checkbox-custom-container">
                                                 <input
                                                     type="checkbox"
-                                                    checked={usuario.permissoes.permissaoA}
-                                                    disabled={usuario.permissoes.isAdmin} // Bloqueia se for Admin pois já tem direito
-                                                    onChange={() => alternarPermissao(usuario.id, 'permissaoA')}
+                                                    checked={usuario.permissoes.controlAcess}
+                                                    disabled={usuario.permissoes.isAdmin}
+                                                    onChange={() => alternarPermissao(usuario.id, 'controlAcess')}
                                                 />
                                                 <span className="checkmark"></span>
                                             </label>
                                         </td>
 
-                                        {/* Caixa B */}
                                         <td className="text-center">
                                             <label className="checkbox-custom-container">
                                                 <input
                                                     type="checkbox"
-                                                    checked={usuario.permissoes.permissaoB}
+                                                    checked={usuario.permissoes.announcement}
                                                     disabled={usuario.permissoes.isAdmin}
-                                                    onChange={() => alternarPermissao(usuario.id, 'permissaoB')}
+                                                    onChange={() => alternarPermissao(usuario.id, 'announcement')}
                                                 />
                                                 <span className="checkmark"></span>
                                             </label>
                                         </td>
 
-                                        {/* Caixa C */}
                                         <td className="text-center">
                                             <label className="checkbox-custom-container">
                                                 <input
                                                     type="checkbox"
-                                                    checked={usuario.permissoes.permissaoC}
+                                                    checked={usuario.permissoes.idtVisual}
                                                     disabled={usuario.permissoes.isAdmin}
-                                                    onChange={() => alternarPermissao(usuario.id, 'permissaoC')}
+                                                    onChange={() => alternarPermissao(usuario.id, 'idtVisual')}
                                                 />
                                                 <span className="checkmark"></span>
                                             </label>

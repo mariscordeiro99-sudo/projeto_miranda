@@ -7,10 +7,9 @@ export const useControleAcesso = () => {
     const [busca, setBusca] = useState<string>('');
 
     useEffect(() => {
-        // Simula a busca de usuários cadastrados no banco Nexa
         const carregarUsuarios = async () => {
             try {
-                await new Promise(resolve => setTimeout(resolve, 600)); // Delay sutil
+                await new Promise(resolve => setTimeout(resolve, 600));
 
                 const mockUsuarios: UsuarioAcesso[] = [
                     {
@@ -19,7 +18,7 @@ export const useControleAcesso = () => {
                         email: "carlos.eduardo@nexa.com",
                         foto: null,
                         roleAtual: "colaborador",
-                        permissoes: { permissaoA: true, permissaoB: false, permissaoC: false, isAdmin: false }
+                        permissoes: { controlAcess: false, announcement: true, idtVisual: false, isAdmin: false }
                     },
                     {
                         id: "u2",
@@ -27,7 +26,7 @@ export const useControleAcesso = () => {
                         email: "mariana.costa@nexa.com",
                         foto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150",
                         roleAtual: "gestor",
-                        permissoes: { permissaoA: true, permissaoB: true, permissaoC: true, isAdmin: true }
+                        permissoes: { controlAcess: true, announcement: true, idtVisual: true, isAdmin: true }
                     },
                     {
                         id: "u3",
@@ -35,7 +34,7 @@ export const useControleAcesso = () => {
                         email: "roberto.alves@nexa.com",
                         foto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150",
                         roleAtual: "colaborador",
-                        permissoes: { permissaoA: false, permissaoB: false, permissaoC: false, isAdmin: false }
+                        permissoes: { controlAcess: false, announcement: false, idtVisual: false, isAdmin: false }
                     }
                 ];
 
@@ -59,9 +58,10 @@ export const useControleAcesso = () => {
             if (chavePermissao === 'isAdmin') {
                 const novoValorAdmin = !novasPermissoes.isAdmin;
                 novasPermissoes.isAdmin = novoValorAdmin;
-                novasPermissoes.permissaoA = novoValorAdmin;
-                novasPermissoes.permissaoB = novoValorAdmin;
-                novasPermissoes.permissaoC = novoValorAdmin;
+
+                novasPermissoes.controlAcess = novoValorAdmin;
+                novasPermissoes.announcement = novoValorAdmin;
+                novasPermissoes.idtVisual = novoValorAdmin;
             } else {
                 novasPermissoes[chavePermissao] = !novasPermissoes[chavePermissao];
             }
@@ -82,9 +82,12 @@ export const useControleAcesso = () => {
 
         try {
             console.log(`Enviando ao Django permissões do usuário ${usuarioId}:`, usuarioAlvo.permissoes);
+
+            localStorage.setItem(`permissoes_${usuarioId}`, JSON.stringify(usuarioAlvo.permissoes));
+            localStorage.setItem(`user_role_${usuarioId}`, usuarioAlvo.roleAtual);
+
             alert(`Permissões de ${usuarioAlvo.nome} atualizadas com sucesso no sistema Nexa!`);
-        } catch (error) {
-            console.error("Erro detalhado do servidor:", error);
+        } catch {
             alert("Erro ao salvar alterações no servidor.");
         }
     };
