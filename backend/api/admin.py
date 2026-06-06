@@ -4,11 +4,14 @@ from .reports import build_dashboard_report
 from .models import (
     Announcement,
     Attachment,
+    AuditLog,
     DeliveryLog,
     Document,
     Institution,
+    PrivacyRequest,
     Profile,
     PushDevice,
+    Segment,
     VisualIdentity,
 )
 
@@ -56,6 +59,14 @@ class VisualIdentityAdmin(admin.ModelAdmin):
     search_fields = ('institution__name',)
 
 
+@admin.register(Segment)
+class SegmentAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active', 'updated_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'slug', 'description')
+    filter_horizontal = ('users', 'push_devices')
+
+
 class AttachmentInline(admin.TabularInline):
     model = Attachment
     extra = 0
@@ -67,6 +78,7 @@ class AnnouncementAdmin(admin.ModelAdmin):
     list_display = ('title', 'status', 'pinned', 'institution', 'author', 'published_at')
     list_filter = ('status', 'pinned', 'institution')
     search_fields = ('title', 'content')
+    filter_horizontal = ('segments',)
     inlines = [AttachmentInline]
 
 
@@ -89,3 +101,28 @@ class DeliveryLogAdmin(admin.ModelAdmin):
     list_display = ('announcement', 'recipient_user', 'channel', 'status', 'sent_at', 'viewed_at')
     list_filter = ('channel', 'status')
     search_fields = ('announcement__title', 'recipient_user__username', 'error_message')
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'actor_username', 'action', 'target_type', 'target_id')
+    list_filter = ('action', 'target_type', 'created_at')
+    search_fields = ('actor_username', 'action', 'target_repr', 'target_id')
+    readonly_fields = (
+        'actor',
+        'actor_username',
+        'action',
+        'target_type',
+        'target_id',
+        'target_repr',
+        'metadata',
+        'created_at',
+    )
+
+
+@admin.register(PrivacyRequest)
+class PrivacyRequestAdmin(admin.ModelAdmin):
+    list_display = ('request_type', 'status', 'requester_email', 'user', 'created_at', 'resolved_at')
+    list_filter = ('request_type', 'status', 'created_at')
+    search_fields = ('requester_name', 'requester_email', 'user__username', 'notes')
+    readonly_fields = ('created_at', 'resolved_at', 'resolved_by')

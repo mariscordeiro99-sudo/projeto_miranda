@@ -46,6 +46,133 @@ Painel Administrativo: http://127.0.0.1:8000/admin/
 
 Documentação da API (Para o Front-End): http://127.0.0.1:8000/api/docs/ -> O Tagor deve consultar esta URL para ver os contratos JSON exatos de cada rota.
 
+## 6. Push Notification com Firebase
+O backend dispara push automaticamente quando um comunicado e publicado. Para ativar o envio real em producao, configure:
+
+```env
+PUSH_DISPATCH_ON_PUBLISH=true
+FIREBASE_ENABLED=true
+FIREBASE_PROJECT_ID=seu-projeto-firebase
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@seu-projeto.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Se `FIREBASE_ENABLED=false` ou as credenciais estiverem ausentes, o backend cria os logs de entrega e deixa as notificacoes como pendentes. O gestor ainda pode tentar o envio manual pelo endpoint:
+
+```http
+POST /api/announcements/{id}/dispatch/
+```
+
+## 7. Gestao de administradores
+Administradores autenticados podem gerenciar gestores autorizados pela API:
+
+```http
+GET /api/managers/
+POST /api/managers/
+PATCH /api/managers/{id}/
+POST /api/managers/{id}/deactivate/
+POST /api/managers/{id}/reactivate/
+POST /api/managers/{id}/revoke/
+```
+
+Criacao minima:
+
+```json
+{
+  "username": "novo_gestor",
+  "email": "novo_gestor@example.com",
+  "password": "SenhaForte123",
+  "first_name": "Novo Gestor",
+  "phone_number": "51999999999"
+}
+```
+
+`deactivate` bloqueia o login do gestor. `revoke` remove o acesso administrativo, apaga tokens ativos e transforma o perfil em cidadao.
+
+## 8. LGPD e auditoria
+Administradores podem consultar trilhas de auditoria pela API:
+
+```http
+GET /api/audit-logs/
+```
+
+Cidadaos autenticados podem abrir solicitacoes LGPD e consultar as proprias solicitacoes:
+
+```http
+GET /api/privacy-requests/
+POST /api/privacy-requests/
+POST /api/privacy/deactivate-account/
+```
+
+Tipos de solicitacao LGPD:
+
+```text
+erasure
+export
+deactivation
+```
+
+Administradores podem concluir ou rejeitar uma solicitacao:
+
+```http
+POST /api/privacy-requests/{id}/complete/
+POST /api/privacy-requests/{id}/reject/
+```
+
+O backend registra auditoria para criacao/publicacao/envio de comunicados, alteracoes de identidade visual, gestao de administradores, solicitacoes LGPD e desativacao de conta pelo proprio cidadao.
+
+A politica operacional LGPD esta documentada em:
+
+```text
+backend/docs/LGPD_POLICY.md
+```
+
+## 9. Segmentacao de envio
+Administradores podem criar segmentos para enviar comunicados a grupos especificos:
+
+```http
+GET /api/segments/
+POST /api/segments/
+PATCH /api/segments/{id}/
+```
+
+Um segmento pode conter usuarios e/ou dispositivos push. Ao criar ou editar um comunicado, informe `segments` com IDs dos segmentos:
+
+```json
+{
+  "title": "Comunicado do bairro",
+  "content": "Mensagem oficial.",
+  "status": "draft",
+  "segments": [1, 2]
+}
+```
+
+Se `segments` estiver vazio ou ausente, o comunicado e enviado para todos os dispositivos ativos.
+
+## 10. Backup e restauracao
+O procedimento operacional de backup e restore esta documentado em:
+
+```text
+backend/docs/BACKUP_RESTORE.md
+```
+
+Politica minima do MVP:
+
+- backup automatico diario no Aiven;
+- retencao minima de 7 dias em testes/MVP e 30 dias ou mais em producao;
+- teste mensal de restore em ambiente separado;
+- arquivos mantidos no Cloudinary, com cuidado para nao apagar recursos manualmente;
+- variaveis do Render documentadas fora do Git, sem segredos no repositorio.
+
+## 11. Guia final de producao
+O guia consolidado de deploy e operacao em producao esta em:
+
+```text
+backend/docs/PRODUCTION_DEPLOYMENT.md
+```
+
+Ele cobre variaveis do Render, deploy, migrations, admin inicial, Cloudinary, Firebase, SMTP, URLs principais e checklist pos-deploy.
+
 ### O Fluxo Final do Git
 Com os arquivos criados e salvos, execute a sequência de salvamento na sua *branch* de infraestrutura:
 

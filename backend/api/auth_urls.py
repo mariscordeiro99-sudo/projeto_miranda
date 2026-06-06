@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import (
+from .auth_views import (
     LoginView,
     PasswordResetConfirmView,
     PasswordResetRequestView,

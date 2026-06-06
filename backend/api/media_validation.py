@@ -5,9 +5,74 @@ import struct
 import subprocess
 import tempfile
 
+from rest_framework.exceptions import ValidationError as DRFValidationError
+
+from .models import Attachment
+
 
 class VideoDurationValidationError(Exception):
     pass
+
+
+MAX_ATTACHMENT_SIZE = 60 * 1024 * 1024
+MAX_VIDEO_DURATION_SECONDS = 60
+MAX_PROFILE_IMAGE_SIZE = 10 * 1024 * 1024
+ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = {
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+}
+ALLOWED_ATTACHMENT_CONTENT_TYPES = {
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+    'video/mp4',
+    'video/quicktime',
+    'video/webm',
+}
+
+
+def attachment_type(uploaded_file):
+    content_type = getattr(uploaded_file, 'content_type', '') or ''
+    if content_type.startswith('image/'):
+        return Attachment.TYPE_IMAGE
+    if content_type.startswith('video/'):
+        return Attachment.TYPE_VIDEO
+    if content_type in {
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    }:
+        return Attachment.TYPE_DOCUMENT
+    return Attachment.TYPE_OTHER
+
+
+def validate_attachment(uploaded_file):
+    content_type = getattr(uploaded_file, 'content_type', '') or ''
+    if content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
+        raise DRFValidationError(f'Unsupported attachment type: {content_type or "unknown"}.')
+    if uploaded_file.size > MAX_ATTACHMENT_SIZE:
+        raise DRFValidationError('Attachment exceeds the 60MB limit.')
+    if content_type.startswith('video/'):
+        try:
+            validate_video_duration(uploaded_file, MAX_VIDEO_DURATION_SECONDS)
+        except VideoDurationValidationError as error:
+            raise DRFValidationError(str(error))
+
+
+def validate_profile_picture(uploaded_file):
+    if not uploaded_file:
+        return
+
+    content_type = getattr(uploaded_file, 'content_type', '') or ''
+    if content_type not in ALLOWED_PROFILE_IMAGE_CONTENT_TYPES:
+        raise DRFValidationError('A foto de perfil deve ser JPG, PNG ou WEBP.')
+
+    if uploaded_file.size > MAX_PROFILE_IMAGE_SIZE:
+        raise DRFValidationError('A foto de perfil deve ter no maximo 10MB.')
 
 
 def validate_video_duration(uploaded_file, max_seconds):

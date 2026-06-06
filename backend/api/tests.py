@@ -1,6 +1,7 @@
 import struct
 import tempfile
 from shutil import rmtree
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -11,8 +12,17 @@ from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.test import APITestCase
 
-from .models import Announcement, Attachment, DeliveryLog, Profile, PushDevice
-from .views import validate_attachment
+from .models import (
+    Announcement,
+    Attachment,
+    AuditLog,
+    DeliveryLog,
+    PrivacyRequest,
+    Profile,
+    PushDevice,
+    Segment,
+)
+from .media_validation import validate_attachment
 
 
 def mp4_atom(atom_type, payload):
@@ -31,6 +41,12 @@ def mp4_file_with_duration(seconds):
         mp4_atom(b'ftyp', b'isom\x00\x00\x00\x01isom')
         + mp4_atom(b'moov', mp4_atom(b'mvhd', mvhd_payload))
     )
+
+
+class SizedUpload:
+    def __init__(self, size, content_type):
+        self.size = size
+        self.content_type = content_type
 
 
 class RegisterViewTests(APITestCase):
@@ -135,6 +151,287 @@ class RegisterViewTests(APITestCase):
         self.assertTrue(profile.profile_picture.name)
 
 
+class ManagerManagementTests(APITestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            username='admin_gestores',
+            email='admin_gestores@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=self.admin_user,
+            phone_number='51911111111',
+            role=Profile.ROLE_MANAGER,
+        )
+        self.citizen_user = User.objects.create_user(
+            username='cidadao_gestores',
+            email='cidadao_gestores@example.com',
+            password='SenhaForte123',
+        )
+        Profile.objects.create(
+            user=self.citizen_user,
+            phone_number='51922222222',
+            role=Profile.ROLE_CITIZEN,
+        )
+
+    def authenticate_as(self, user):
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+        return token
+
+    def create_manager(self, username='gestor_criado'):
+        manager = User.objects.create_user(
+            username=username,
+            email=f'{username}@example.com',
+            password='SenhaForte123',
+            first_name='Gestor Criado',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=manager,
+            phone_number='51933333333',
+            role=Profile.ROLE_MANAGER,
+        )
+        return manager
+
+    def test_managers_endpoint_requires_admin_user(self):
+        anonymous_response = self.client.get('/api/managers/')
+        self.assertEqual(anonymous_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.authenticate_as(self.citizen_user)
+        citizen_response = self.client.get('/api/managers/')
+        self.assertEqual(citizen_response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_create_manager(self):
+        self.authenticate_as(self.admin_user)
+
+        response = self.client.post(
+            '/api/managers/',
+            {
+                'username': 'novo_gestor',
+                'email': 'novo_gestor@example.com',
+                'password': 'SenhaForte123',
+                'first_name': 'Novo Gestor',
+                'phone_number': '51944444444',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        manager = User.objects.get(username='novo_gestor')
+        self.assertTrue(manager.is_staff)
+        self.assertTrue(manager.is_active)
+        self.assertEqual(manager.profile.role, Profile.ROLE_MANAGER)
+        self.assertEqual(manager.profile.phone_number, '51944444444')
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='manager_created',
+                target_id=str(manager.id),
+            ).exists()
+        )
+
+    def test_admin_can_update_manager_contact_data(self):
+        manager = self.create_manager()
+        self.authenticate_as(self.admin_user)
+
+        response = self.client.patch(
+            f'/api/managers/{manager.id}/',
+            {
+                'first_name': 'Gestor Atualizado',
+                'phone_number': '51955555555',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        manager.refresh_from_db()
+        manager.profile.refresh_from_db()
+        self.assertEqual(manager.first_name, 'Gestor Atualizado')
+        self.assertEqual(manager.profile.phone_number, '51955555555')
+        self.assertTrue(manager.is_staff)
+        self.assertEqual(manager.profile.role, Profile.ROLE_MANAGER)
+
+    def test_admin_can_deactivate_and_reactivate_manager(self):
+        manager = self.create_manager()
+        self.authenticate_as(self.admin_user)
+
+        deactivate_response = self.client.post(f'/api/managers/{manager.id}/deactivate/')
+        self.assertEqual(deactivate_response.status_code, status.HTTP_200_OK)
+        manager.refresh_from_db()
+        self.assertFalse(manager.is_active)
+
+        reactivate_response = self.client.post(f'/api/managers/{manager.id}/reactivate/')
+        self.assertEqual(reactivate_response.status_code, status.HTTP_200_OK)
+        manager.refresh_from_db()
+        manager.profile.refresh_from_db()
+        self.assertTrue(manager.is_active)
+        self.assertTrue(manager.is_staff)
+        self.assertEqual(manager.profile.role, Profile.ROLE_MANAGER)
+
+    def test_admin_can_revoke_manager_access(self):
+        manager = self.create_manager()
+        manager_token = Token.objects.create(user=manager)
+        self.authenticate_as(self.admin_user)
+
+        response = self.client.post(f'/api/managers/{manager.id}/revoke/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        manager.refresh_from_db()
+        manager.profile.refresh_from_db()
+        self.assertFalse(manager.is_staff)
+        self.assertTrue(manager.is_active)
+        self.assertEqual(manager.profile.role, Profile.ROLE_CITIZEN)
+        self.assertFalse(Token.objects.filter(key=manager_token.key).exists())
+
+    def test_admin_cannot_deactivate_or_revoke_self(self):
+        self.authenticate_as(self.admin_user)
+
+        deactivate_response = self.client.post(f'/api/managers/{self.admin_user.id}/deactivate/')
+        revoke_response = self.client.post(f'/api/managers/{self.admin_user.id}/revoke/')
+
+        self.assertEqual(deactivate_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(revoke_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.admin_user.refresh_from_db()
+        self.admin_user.profile.refresh_from_db()
+        self.assertTrue(self.admin_user.is_staff)
+        self.assertTrue(self.admin_user.is_active)
+        self.assertEqual(self.admin_user.profile.role, Profile.ROLE_MANAGER)
+
+
+class PrivacyAndAuditTests(APITestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            username='admin_lgpd',
+            email='admin_lgpd@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=self.admin_user,
+            phone_number='51911111111',
+            role=Profile.ROLE_MANAGER,
+        )
+        self.citizen_user = User.objects.create_user(
+            username='cidadao_lgpd',
+            email='cidadao_lgpd@example.com',
+            password='SenhaForte123',
+        )
+        Profile.objects.create(
+            user=self.citizen_user,
+            phone_number='51922222222',
+            role=Profile.ROLE_CITIZEN,
+        )
+
+    def authenticate_as(self, user):
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+        return token
+
+    def test_audit_logs_are_admin_only(self):
+        AuditLog.objects.create(
+            actor=self.admin_user,
+            actor_username=self.admin_user.username,
+            action='test_action',
+        )
+
+        anonymous_response = self.client.get('/api/audit-logs/')
+        self.assertEqual(anonymous_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.authenticate_as(self.citizen_user)
+        citizen_response = self.client.get('/api/audit-logs/')
+        self.assertEqual(citizen_response.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.authenticate_as(self.admin_user)
+        admin_response = self.client.get('/api/audit-logs/')
+        self.assertEqual(admin_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(admin_response.data[0]['action'], 'test_action')
+
+    def test_citizen_can_create_and_list_own_privacy_request(self):
+        self.authenticate_as(self.citizen_user)
+
+        response = self.client.post(
+            '/api/privacy-requests/',
+            {
+                'request_type': PrivacyRequest.TYPE_ERASURE,
+                'notes': 'Quero solicitar exclusao dos meus dados.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        privacy_request = PrivacyRequest.objects.get(id=response.data['id'])
+        self.assertEqual(privacy_request.user, self.citizen_user)
+        self.assertEqual(privacy_request.requester_email, self.citizen_user.email)
+        self.assertEqual(privacy_request.status, PrivacyRequest.STATUS_PENDING)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.citizen_user,
+                action='privacy_request_created',
+                target_id=str(privacy_request.id),
+            ).exists()
+        )
+
+        list_response = self.client.get('/api/privacy-requests/')
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(list_response.data), 1)
+
+    def test_admin_can_complete_privacy_request(self):
+        privacy_request = PrivacyRequest.objects.create(
+            user=self.citizen_user,
+            requester_name='Cidadao LGPD',
+            requester_email=self.citizen_user.email,
+            request_type=PrivacyRequest.TYPE_EXPORT,
+        )
+        self.authenticate_as(self.admin_user)
+
+        response = self.client.post(
+            f'/api/privacy-requests/{privacy_request.id}/complete/',
+            {'notes': 'Dados exportados e enviados ao solicitante.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        privacy_request.refresh_from_db()
+        self.assertEqual(privacy_request.status, PrivacyRequest.STATUS_COMPLETED)
+        self.assertEqual(privacy_request.resolved_by, self.admin_user)
+        self.assertIsNotNone(privacy_request.resolved_at)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='privacy_request_completed',
+                target_id=str(privacy_request.id),
+            ).exists()
+        )
+
+    def test_citizen_can_deactivate_own_account_and_token_is_revoked(self):
+        token = self.authenticate_as(self.citizen_user)
+
+        response = self.client.post('/api/privacy/deactivate-account/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.citizen_user.refresh_from_db()
+        self.assertFalse(self.citizen_user.is_active)
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.citizen_user,
+                action='account_deactivated_by_owner',
+                target_id=str(self.citizen_user.id),
+            ).exists()
+        )
+
+    def test_admin_cannot_deactivate_own_account_by_privacy_endpoint(self):
+        self.authenticate_as(self.admin_user)
+
+        response = self.client.post('/api/privacy/deactivate-account/')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.admin_user.refresh_from_db()
+        self.assertTrue(self.admin_user.is_active)
+
+
 class AttachmentValidationTests(APITestCase):
     def test_video_with_60_seconds_is_allowed(self):
         uploaded_file = SimpleUploadedFile(
@@ -154,6 +451,161 @@ class AttachmentValidationTests(APITestCase):
 
         with self.assertRaises(DRFValidationError):
             validate_attachment(uploaded_file)
+
+    def test_attachment_over_60mb_is_blocked(self):
+        uploaded_file = SizedUpload(
+            size=(60 * 1024 * 1024) + 1,
+            content_type='application/pdf',
+        )
+
+        with self.assertRaises(DRFValidationError):
+            validate_attachment(uploaded_file)
+
+    def test_unsupported_attachment_type_is_blocked(self):
+        uploaded_file = SimpleUploadedFile(
+            'script.exe',
+            b'MZ',
+            content_type='application/x-msdownload',
+        )
+
+        with self.assertRaises(DRFValidationError):
+            validate_attachment(uploaded_file)
+
+
+class AttachmentUploadAPITests(APITestCase):
+    def setUp(self):
+        self.media_root = tempfile.mkdtemp()
+        self.test_storages = {
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        }
+        self.staff_user = User.objects.create_user(
+            username='gestor_upload',
+            email='gestor_upload@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=self.staff_user,
+            phone_number='51911111111',
+            role=Profile.ROLE_MANAGER,
+        )
+
+    def tearDown(self):
+        rmtree(self.media_root, ignore_errors=True)
+
+    def authenticate_as_staff(self):
+        token = Token.objects.create(user=self.staff_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    def png_file(self, name='imagem.png'):
+        return SimpleUploadedFile(
+            name,
+            (
+                b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR'
+                b'\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06'
+                b'\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDAT'
+                b'x\x9cc\xf8\xcfP\x0f\x00\x03\x86\x01\x80Z4}k'
+                b'\x00\x00\x00\x00IEND\xaeB`\x82'
+            ),
+            content_type='image/png',
+        )
+
+    def test_staff_can_upload_pdf_word_docx_and_image_with_announcement(self):
+        self.authenticate_as_staff()
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            response = self.client.post(
+                '/api/announcements/',
+                {
+                    'title': 'Comunicado com anexos',
+                    'content': 'Conteudo com arquivos oficiais.',
+                    'status': Announcement.STATUS_DRAFT,
+                    'attachments': [
+                        SimpleUploadedFile(
+                            'edital.pdf',
+                            b'%PDF-1.4\n',
+                            content_type='application/pdf',
+                        ),
+                        SimpleUploadedFile(
+                            'oficio.doc',
+                            b'DOC',
+                            content_type='application/msword',
+                        ),
+                        SimpleUploadedFile(
+                            'ata.docx',
+                            b'DOCX',
+                            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        ),
+                        self.png_file(),
+                    ],
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        announcement = Announcement.objects.get(id=response.data['id'])
+        attachments = list(announcement.attachments.order_by('original_name'))
+        self.assertEqual(len(attachments), 4)
+
+        file_types = {attachment.original_name: attachment.file_type for attachment in attachments}
+        self.assertEqual(file_types['ata.docx'], Attachment.TYPE_DOCUMENT)
+        self.assertEqual(file_types['edital.pdf'], Attachment.TYPE_DOCUMENT)
+        self.assertEqual(file_types['oficio.doc'], Attachment.TYPE_DOCUMENT)
+        self.assertEqual(file_types['imagem.png'], Attachment.TYPE_IMAGE)
+
+    def test_attachment_endpoint_classifies_single_image_upload(self):
+        self.authenticate_as_staff()
+        announcement = Announcement.objects.create(
+            author=self.staff_user,
+            title='Comunicado imagem',
+            content='Conteudo',
+            status=Announcement.STATUS_DRAFT,
+        )
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            response = self.client.post(
+                '/api/attachments/',
+                {
+                    'announcement': announcement.id,
+                    'file': self.png_file('foto.png'),
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        attachment = Attachment.objects.get(id=response.data['id'])
+        self.assertEqual(attachment.original_name, 'foto.png')
+        self.assertEqual(attachment.file_type, Attachment.TYPE_IMAGE)
+
+    def test_invalid_attachment_upload_is_rejected_before_announcement_is_saved(self):
+        self.authenticate_as_staff()
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            response = self.client.post(
+                '/api/announcements/',
+                {
+                    'title': 'Comunicado invalido',
+                    'content': 'Nao deve persistir se anexo falhar.',
+                    'status': Announcement.STATUS_DRAFT,
+                    'attachments': [
+                        SimpleUploadedFile(
+                            'malware.exe',
+                            b'MZ',
+                            content_type='application/x-msdownload',
+                        ),
+                    ],
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(Announcement.objects.filter(title='Comunicado invalido').exists())
+        self.assertFalse(Attachment.objects.filter(original_name='malware.exe').exists())
 
 
 class PublicDataExposureTests(APITestCase):
@@ -231,6 +683,324 @@ class PublicDataExposureTests(APITestCase):
         self.assertNotIn('is_staff', response.data['author'])
 
 
+class DeliveryViewTrackingTests(APITestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username='gestor_visualizacao',
+            email='gestor_visualizacao@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        self.citizen_user = User.objects.create_user(
+            username='cidadao_visualizacao',
+            email='cidadao_visualizacao@example.com',
+            password='SenhaForte123',
+        )
+        self.device = PushDevice.objects.create(
+            user=self.citizen_user,
+            token='view-device-token',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.announcement = Announcement.objects.create(
+            author=self.staff_user,
+            title='Comunicado para visualizar',
+            content='Conteudo do comunicado',
+            status=Announcement.STATUS_DRAFT,
+        )
+
+    def authenticate_as(self, user):
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    def test_publish_creates_only_one_delivery_log_per_device(self):
+        self.authenticate_as(self.staff_user)
+
+        first_response = self.client.post(f'/api/announcements/{self.announcement.id}/publish/')
+        second_response = self.client.post(f'/api/announcements/{self.announcement.id}/publish/')
+
+        self.assertEqual(first_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            DeliveryLog.objects.filter(
+                announcement=self.announcement,
+                device=self.device,
+            ).count(),
+            1,
+        )
+
+    def test_authenticated_citizen_marks_own_announcement_as_viewed(self):
+        self.announcement.status = Announcement.STATUS_PUBLISHED
+        self.announcement.save()
+        log = DeliveryLog.objects.create(
+            announcement=self.announcement,
+            device=self.device,
+            recipient_user=self.citizen_user,
+            status=DeliveryLog.STATUS_SENT,
+        )
+        self.authenticate_as(self.citizen_user)
+
+        response = self.client.post(
+            f'/api/announcements/{self.announcement.id}/mark-viewed/',
+            {'delivery_log_id': log.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        log.refresh_from_db()
+        self.assertEqual(log.status, DeliveryLog.STATUS_VIEWED)
+        self.assertIsNotNone(log.viewed_at)
+
+        self.authenticate_as(self.staff_user)
+        stats_response = self.client.get(f'/api/announcements/{self.announcement.id}/stats/')
+        self.assertEqual(stats_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(stats_response.data['viewed'], 1)
+        self.assertEqual(stats_response.data['view_rate'], 100.0)
+
+    def test_device_token_can_mark_anonymous_delivery_as_viewed(self):
+        self.announcement.status = Announcement.STATUS_PUBLISHED
+        self.announcement.save()
+        anonymous_device = PushDevice.objects.create(
+            token='anonymous-view-token',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        log = DeliveryLog.objects.create(
+            announcement=self.announcement,
+            device=anonymous_device,
+            status=DeliveryLog.STATUS_SENT,
+        )
+
+        response = self.client.post(
+            f'/api/announcements/{self.announcement.id}/mark-viewed/',
+            {
+                'delivery_log_id': log.id,
+                'device_token': anonymous_device.token,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        log.refresh_from_db()
+        self.assertEqual(log.status, DeliveryLog.STATUS_VIEWED)
+
+
+class AutomaticPushDispatchTests(APITestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username='gestor_push',
+            email='gestor_push@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        self.citizen_user = User.objects.create_user(
+            username='cidadao_push',
+            email='cidadao_push@example.com',
+            password='SenhaForte123',
+        )
+        self.device = PushDevice.objects.create(
+            user=self.citizen_user,
+            token='firebase-token',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.announcement = Announcement.objects.create(
+            author=self.staff_user,
+            title='Comunicado com push',
+            content='Conteudo para envio automatico',
+            status=Announcement.STATUS_DRAFT,
+        )
+
+    def authenticate_as_staff(self):
+        token = Token.objects.create(user=self.staff_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    @override_settings(PUSH_DISPATCH_ON_PUBLISH=True)
+    @patch('api.delivery.PushNotificationService')
+    def test_publish_dispatches_push_automatically(self, service_class):
+        service = service_class.return_value
+        service.dispatch_pending_for_announcement.return_value = {
+            'configured': True,
+            'sent': 1,
+            'failed': 0,
+            'pending': 0,
+        }
+        self.authenticate_as_staff()
+
+        response = self.client.post(f'/api/announcements/{self.announcement.id}/publish/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        service.dispatch_pending_for_announcement.assert_called_once()
+        self.assertEqual(response.data['push_dispatch']['configured'], True)
+        self.assertEqual(response.data['push_dispatch']['sent'], 1)
+        self.assertEqual(response.data['push_dispatch']['skipped'], False)
+        self.assertEqual(
+            DeliveryLog.objects.filter(
+                announcement=self.announcement,
+                device=self.device,
+            ).count(),
+            1,
+        )
+
+    @override_settings(PUSH_DISPATCH_ON_PUBLISH=False)
+    @patch('api.delivery.PushNotificationService')
+    def test_publish_can_keep_push_pending_when_auto_dispatch_is_disabled(self, service_class):
+        self.authenticate_as_staff()
+
+        response = self.client.post(f'/api/announcements/{self.announcement.id}/publish/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        service_class.assert_not_called()
+        self.assertEqual(response.data['push_dispatch']['skipped'], True)
+        self.assertEqual(response.data['push_dispatch']['pending'], 1)
+        self.assertEqual(
+            DeliveryLog.objects.get(
+                announcement=self.announcement,
+                device=self.device,
+            ).status,
+            DeliveryLog.STATUS_PENDING,
+        )
+
+
+class SegmentDispatchTests(APITestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username='gestor_segmento',
+            email='gestor_segmento@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        self.citizen_a = User.objects.create_user(
+            username='cidadao_segmento_a',
+            email='cidadao_segmento_a@example.com',
+            password='SenhaForte123',
+        )
+        self.citizen_b = User.objects.create_user(
+            username='cidadao_segmento_b',
+            email='cidadao_segmento_b@example.com',
+            password='SenhaForte123',
+        )
+        self.device_a = PushDevice.objects.create(
+            user=self.citizen_a,
+            token='segment-device-a',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.device_b = PushDevice.objects.create(
+            user=self.citizen_b,
+            token='segment-device-b',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.anonymous_device = PushDevice.objects.create(
+            token='segment-anonymous-device',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+
+    def authenticate_as_staff(self):
+        token = Token.objects.create(user=self.staff_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    def test_segment_endpoint_is_admin_only_and_creates_audit_log(self):
+        anonymous_response = self.client.get('/api/segments/')
+        self.assertEqual(anonymous_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.authenticate_as_staff()
+        response = self.client.post(
+            '/api/segments/',
+            {
+                'name': 'Bairro Centro',
+                'slug': 'bairro-centro',
+                'description': 'Moradores do centro.',
+                'users': [self.citizen_a.id],
+                'push_devices': [self.anonymous_device.id],
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        segment = Segment.objects.get(slug='bairro-centro')
+        self.assertEqual(segment.users.count(), 1)
+        self.assertEqual(segment.push_devices.count(), 1)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.staff_user,
+                action='segment_created',
+                target_id=str(segment.id),
+            ).exists()
+        )
+
+    @override_settings(PUSH_DISPATCH_ON_PUBLISH=False)
+    def test_segmented_announcement_delivers_only_to_segment_devices(self):
+        segment = Segment.objects.create(
+            name='Saude',
+            slug='saude',
+            description='Comunicados da saude.',
+        )
+        segment.users.add(self.citizen_a)
+        segment.push_devices.add(self.anonymous_device)
+        self.authenticate_as_staff()
+
+        create_response = self.client.post(
+            '/api/announcements/',
+            {
+                'title': 'Comunicado segmentado',
+                'content': 'Somente para um segmento.',
+                'status': Announcement.STATUS_DRAFT,
+                'segments': [segment.id],
+            },
+            format='json',
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+
+        publish_response = self.client.post(
+            f'/api/announcements/{create_response.data["id"]}/publish/'
+        )
+        self.assertEqual(publish_response.status_code, status.HTTP_200_OK)
+
+        announcement = Announcement.objects.get(id=create_response.data['id'])
+        delivered_device_ids = set(
+            DeliveryLog.objects
+            .filter(announcement=announcement)
+            .values_list('device_id', flat=True)
+        )
+        self.assertEqual(delivered_device_ids, {self.device_a.id, self.anonymous_device.id})
+        self.assertEqual(publish_response.data['push_dispatch']['pending'], 2)
+
+    @override_settings(PUSH_DISPATCH_ON_PUBLISH=False)
+    def test_announcement_without_segments_delivers_to_all_active_devices(self):
+        self.authenticate_as_staff()
+
+        create_response = self.client.post(
+            '/api/announcements/',
+            {
+                'title': 'Comunicado geral',
+                'content': 'Para todos.',
+                'status': Announcement.STATUS_DRAFT,
+            },
+            format='json',
+        )
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+
+        publish_response = self.client.post(
+            f'/api/announcements/{create_response.data["id"]}/publish/'
+        )
+        self.assertEqual(publish_response.status_code, status.HTTP_200_OK)
+
+        announcement = Announcement.objects.get(id=create_response.data['id'])
+        delivered_device_ids = set(
+            DeliveryLog.objects
+            .filter(announcement=announcement)
+            .values_list('device_id', flat=True)
+        )
+        self.assertEqual(
+            delivered_device_ids,
+            {self.device_a.id, self.device_b.id, self.anonymous_device.id},
+        )
+        self.assertEqual(publish_response.data['push_dispatch']['pending'], 3)
+
+
 class DashboardReportTests(APITestCase):
     def setUp(self):
         self.staff_user = User.objects.create_user(
@@ -304,7 +1074,7 @@ class DashboardReportTests(APITestCase):
         )
         DeliveryLog.objects.create(
             announcement=self.published,
-            device=self.active_device,
+            device=None,
             recipient_user=self.citizen_user,
             status=DeliveryLog.STATUS_SENT,
         )

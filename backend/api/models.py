@@ -93,6 +93,33 @@ class VisualIdentity(models.Model):
         return f'Identidade visual - {self.institution.name}'
 
 
+class Segment(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    slug = models.SlugField(max_length=140, unique=True)
+    description = models.TextField(blank=True)
+    users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='segments',
+        blank=True,
+    )
+    push_devices = models.ManyToManyField(
+        'PushDevice',
+        related_name='segments',
+        blank=True,
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Segmento'
+        verbose_name_plural = 'Segmentos'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Announcement(models.Model):
     STATUS_DRAFT = 'draft'
     STATUS_PUBLISHED = 'published'
@@ -120,6 +147,11 @@ class Announcement(models.Model):
     title = models.CharField(max_length=180)
     content = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    segments = models.ManyToManyField(
+        Segment,
+        related_name='announcements',
+        blank=True,
+    )
     pinned = models.BooleanField(default=False)
     published_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -251,6 +283,12 @@ class DeliveryLog(models.Model):
         verbose_name = 'Log de entrega'
         verbose_name_plural = 'Logs de entrega'
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['announcement', 'device'],
+                name='unique_delivery_log_per_device',
+            ),
+        ]
         indexes = [
             models.Index(fields=['announcement', 'status']),
             models.Index(fields=['recipient_user', 'created_at']),
@@ -258,3 +296,89 @@ class DeliveryLog(models.Model):
 
     def __str__(self):
         return f'{self.announcement_id} - {self.status}'
+
+
+class AuditLog(models.Model):
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='audit_logs',
+        blank=True,
+        null=True,
+    )
+    actor_username = models.CharField(max_length=150, blank=True)
+    action = models.CharField(max_length=80, db_index=True)
+    target_type = models.CharField(max_length=80, blank=True, db_index=True)
+    target_id = models.CharField(max_length=80, blank=True, db_index=True)
+    target_repr = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Log de auditoria'
+        verbose_name_plural = 'Logs de auditoria'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['actor', 'created_at']),
+            models.Index(fields=['action', 'created_at']),
+            models.Index(fields=['target_type', 'target_id']),
+        ]
+
+    def __str__(self):
+        actor = self.actor_username or 'sistema'
+        return f'{self.created_at:%Y-%m-%d %H:%M} - {actor} - {self.action}'
+
+
+class PrivacyRequest(models.Model):
+    TYPE_ERASURE = 'erasure'
+    TYPE_EXPORT = 'export'
+    TYPE_DEACTIVATION = 'deactivation'
+    TYPE_CHOICES = [
+        (TYPE_ERASURE, 'Exclusao de dados'),
+        (TYPE_EXPORT, 'Exportacao de dados'),
+        (TYPE_DEACTIVATION, 'Desativacao de conta'),
+    ]
+
+    STATUS_PENDING = 'pending'
+    STATUS_COMPLETED = 'completed'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pendente'),
+        (STATUS_COMPLETED, 'Concluida'),
+        (STATUS_REJECTED, 'Rejeitada'),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='privacy_requests',
+        blank=True,
+        null=True,
+    )
+    requester_name = models.CharField(max_length=180, blank=True)
+    requester_email = models.EmailField(blank=True)
+    request_type = models.CharField(max_length=30, choices=TYPE_CHOICES, default=TYPE_ERASURE)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(blank=True, null=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='resolved_privacy_requests',
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        verbose_name = 'Solicitacao LGPD'
+        verbose_name_plural = 'Solicitacoes LGPD'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'created_at']),
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['request_type', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.request_type} - {self.requester_email or self.requester_name}'

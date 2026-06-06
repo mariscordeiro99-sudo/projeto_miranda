@@ -1,15 +1,21 @@
-from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
 
 from .models import (
     Announcement,
     Attachment,
+    AuditLog,
     DeliveryLog,
     Document,
     Institution,
+    PrivacyRequest,
     Profile,
     PushDevice,
+    Segment,
     VisualIdentity,
 )
 
@@ -49,6 +55,117 @@ class ProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
 
+class ManagerSerializer(serializers.ModelSerializer):
+    phone_number = serializers.CharField(required=False, allow_blank=True)
+    password = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=False,
+        style={'input_type': 'password'},
+    )
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'first_name',
+            'phone_number',
+            'is_active',
+            'is_staff',
+            'role',
+            'date_joined',
+            'password',
+        ]
+        read_only_fields = ['id', 'is_staff', 'role', 'date_joined']
+
+    def get_role(self, obj):
+        profile = getattr(obj, 'profile', None)
+        return profile.role if profile else None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        profile = getattr(instance, 'profile', None)
+        data['phone_number'] = profile.phone_number if profile else ''
+        return data
+
+    def validate(self, attrs):
+        if self.instance is None and not attrs.get('password'):
+            raise serializers.ValidationError({'password': 'password is required.'})
+
+        username = attrs.get('username')
+        if self.instance is None and not username:
+            raise serializers.ValidationError({'username': 'username is required.'})
+
+        email = attrs.get('email', '')
+        if self.instance is None and not email:
+            raise serializers.ValidationError({'email': 'email is required.'})
+
+        user_id = self.instance.id if self.instance else None
+        if username and User.objects.exclude(id=user_id).filter(username=username).exists():
+            raise serializers.ValidationError({'username': 'username already exists.'})
+
+        if email and User.objects.exclude(id=user_id).filter(email__iexact=email).exists():
+            raise serializers.ValidationError({'email': 'email already exists.'})
+
+        password = attrs.get('password')
+        if password:
+            candidate = self.instance or User(
+                username=username or '',
+                email=email,
+                first_name=attrs.get('first_name', ''),
+            )
+            try:
+                validate_password(password, user=candidate)
+            except ValidationError as error:
+                raise serializers.ValidationError({'password': list(error.messages)})
+
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        phone_number = validated_data.pop('phone_number', '')
+        password = validated_data.pop('password')
+        is_active = validated_data.pop('is_active', True)
+        user = User(
+            **validated_data,
+            is_staff=True,
+            is_active=is_active,
+        )
+        user.set_password(password)
+        user.save()
+        Profile.objects.update_or_create(
+            user=user,
+            defaults={
+                'phone_number': phone_number,
+                'role': Profile.ROLE_MANAGER,
+            },
+        )
+        return user
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        phone_number = validated_data.pop('phone_number', None)
+        password = validated_data.pop('password', None)
+
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+
+        instance.is_staff = True
+        if password:
+            instance.set_password(password)
+        instance.save()
+
+        profile, _ = Profile.objects.get_or_create(user=instance)
+        if phone_number is not None:
+            profile.phone_number = phone_number
+        profile.role = Profile.ROLE_MANAGER
+        profile.save()
+        return instance
+
+
 class VisualIdentitySerializer(serializers.ModelSerializer):
     class Meta:
         model = VisualIdentity
@@ -83,6 +200,34 @@ class InstitutionSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
 
+class SegmentSerializer(serializers.ModelSerializer):
+    users_count = serializers.SerializerMethodField()
+    push_devices_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Segment
+        fields = [
+            'id',
+            'name',
+            'slug',
+            'description',
+            'users',
+            'push_devices',
+            'users_count',
+            'push_devices_count',
+            'is_active',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'users_count', 'push_devices_count']
+
+    def get_users_count(self, obj):
+        return obj.users.count()
+
+    def get_push_devices_count(self, obj):
+        return obj.push_devices.count()
+
+
 class AttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attachment
@@ -100,6 +245,11 @@ class AttachmentSerializer(serializers.ModelSerializer):
 class AnnouncementSerializer(serializers.ModelSerializer):
     author = serializers.SerializerMethodField()
     attachments = AttachmentSerializer(many=True, read_only=True)
+    segments = serializers.PrimaryKeyRelatedField(
+        queryset=Segment.objects.filter(is_active=True),
+        many=True,
+        required=False,
+    )
 
     class Meta:
         model = Announcement
@@ -110,6 +260,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
             'title',
             'content',
             'status',
+            'segments',
             'pinned',
             'published_at',
             'attachments',
@@ -165,3 +316,55 @@ class DeliveryLogSerializer(serializers.ModelSerializer):
             'created_at',
         ]
         read_only_fields = ['created_at']
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    actor = UserSummarySerializer(read_only=True)
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id',
+            'actor',
+            'actor_username',
+            'action',
+            'target_type',
+            'target_id',
+            'target_repr',
+            'metadata',
+            'created_at',
+        ]
+        read_only_fields = fields
+
+
+class PrivacyRequestSerializer(serializers.ModelSerializer):
+    user = UserSummarySerializer(read_only=True)
+    resolved_by = UserSummarySerializer(read_only=True)
+
+    class Meta:
+        model = PrivacyRequest
+        fields = [
+            'id',
+            'user',
+            'requester_name',
+            'requester_email',
+            'request_type',
+            'status',
+            'notes',
+            'created_at',
+            'resolved_at',
+            'resolved_by',
+        ]
+        read_only_fields = [
+            'id',
+            'user',
+            'status',
+            'created_at',
+            'resolved_at',
+            'resolved_by',
+        ]
+
+    def validate_requester_email(self, value):
+        if not value and self.context.get('request') and self.context['request'].user.email:
+            return self.context['request'].user.email
+        return value

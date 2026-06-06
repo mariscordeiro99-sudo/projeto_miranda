@@ -35,3 +35,13 @@ services:
         value: "true"
       - key: CORS_ALLOW_ALL_ORIGINS
         value: "false"
+      - key: PUSH_DISPATCH_ON_PUBLISH
+        value: "true"
+      - key: FIREBASE_ENABLED
+        value: "false"
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false

@@ -1,107 +1,45 @@
-import cloudinary.exceptions
-from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.tokens import default_token_generator
-from django.conf import settings
-from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
-from django.db import transaction
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.db.models import Q
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
-from rest_framework import parsers, permissions, serializers, status, throttling, viewsets
+from rest_framework import parsers, permissions, serializers, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .audit import record_audit_log
+from .delivery import create_pending_delivery_logs, dispatch_published_announcement
 from .models import (
     Announcement,
     Attachment,
+    AuditLog,
     DeliveryLog,
     Document,
     Institution,
+    PrivacyRequest,
     Profile,
     PushDevice,
+    Segment,
     VisualIdentity,
 )
-from .media_validation import VideoDurationValidationError, validate_video_duration
+from .media_validation import attachment_type, validate_attachment
 from .reports import build_dashboard_report
 from .serializers import (
     AnnouncementSerializer,
     AttachmentSerializer,
+    AuditLogSerializer,
     DeliveryLogSerializer,
     DocumentSerializer,
     InstitutionSerializer,
+    ManagerSerializer,
+    PrivacyRequestSerializer,
     ProfileSerializer,
     PushDeviceSerializer,
+    SegmentSerializer,
     VisualIdentitySerializer,
 )
 from .services import PushNotificationService
-
-
-MAX_ATTACHMENT_SIZE = 60 * 1024 * 1024
-MAX_VIDEO_DURATION_SECONDS = 60
-MAX_PROFILE_IMAGE_SIZE = 10 * 1024 * 1024
-ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = {
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-}
-ALLOWED_ATTACHMENT_CONTENT_TYPES = {
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'video/mp4',
-    'video/quicktime',
-    'video/webm',
-}
-
-
-def attachment_type(uploaded_file):
-    content_type = getattr(uploaded_file, 'content_type', '') or ''
-    if content_type.startswith('image/'):
-        return Attachment.TYPE_IMAGE
-    if content_type.startswith('video/'):
-        return Attachment.TYPE_VIDEO
-    if content_type in {
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    }:
-        return Attachment.TYPE_DOCUMENT
-    return Attachment.TYPE_OTHER
-
-
-def validate_attachment(uploaded_file):
-    content_type = getattr(uploaded_file, 'content_type', '') or ''
-    if content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
-        raise DRFValidationError(f'Unsupported attachment type: {content_type or "unknown"}.')
-    if uploaded_file.size > MAX_ATTACHMENT_SIZE:
-        raise DRFValidationError('Attachment exceeds the 60MB limit.')
-    if content_type.startswith('video/'):
-        try:
-            validate_video_duration(uploaded_file, MAX_VIDEO_DURATION_SECONDS)
-        except VideoDurationValidationError as error:
-            raise DRFValidationError(str(error))
-
-
-def validate_profile_picture(uploaded_file):
-    if not uploaded_file:
-        return
-
-    content_type = getattr(uploaded_file, 'content_type', '') or ''
-    if content_type not in ALLOWED_PROFILE_IMAGE_CONTENT_TYPES:
-        raise DRFValidationError('A foto de perfil deve ser JPG, PNG ou WEBP.')
-
-    if uploaded_file.size > MAX_PROFILE_IMAGE_SIZE:
-        raise DRFValidationError('A foto de perfil deve ter no maximo 10MB.')
 
 
 class IsManagerOrReadOnly(permissions.BasePermission):
@@ -143,240 +81,6 @@ class DashboardReportView(APIView):
         return Response(build_dashboard_report())
 
 
-class RegisterView(APIView):
-    authentication_classes = []
-    permission_classes = []
-    throttle_classes = [throttling.ScopedRateThrottle]
-    throttle_scope = 'auth_register'
-    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
-
-    def post(self, request, *args, **kwargs):
-        username = request.data.get('username', '')
-        email = request.data.get('email', '')
-        password = request.data.get('password', '')
-        first_name = request.data.get('first_name', '')
-        phone = request.data.get('telefone', '') or request.data.get('phone_number', '')
-        profile_picture = request.FILES.get('profile_picture')
-        requested_manager_access = str(
-            request.data.get('isGestor', '') or request.data.get('is_gestor', '')
-        ).lower() in ('true', '1', 'yes')
-
-        if not username or not email or not password:
-            return Response(
-                {'detail': 'username, email and password are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if requested_manager_access:
-            return Response(
-                {'detail': 'Cadastro de gestor deve ser feito por um administrador autorizado.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        try:
-            validate_profile_picture(profile_picture)
-        except DRFValidationError as error:
-            detail = error.detail[0] if isinstance(error.detail, list) else error.detail
-            return Response(
-                {'detail': str(detail)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if User.objects.filter(username=username).exists():
-            return Response(
-                {'detail': 'username already exists.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if User.objects.filter(email=email).exists():
-            return Response(
-                {'detail': 'email already exists.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        candidate_user = User(username=username, email=email, first_name=first_name)
-        try:
-            validate_password(password, user=candidate_user)
-        except ValidationError as error:
-            return Response(
-                {'detail': list(error.messages)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            with transaction.atomic():
-                user = User(
-                    username=username,
-                    email=email,
-                    first_name=first_name,
-                    last_name=phone,
-                    is_staff=False,
-                )
-                user.set_password(password)
-                user.save()
-                Profile.objects.create(
-                    user=user,
-                    phone_number=phone,
-                    role=Profile.ROLE_CITIZEN,
-                    profile_picture=profile_picture,
-                )
-        except cloudinary.exceptions.Error:
-            return Response(
-                {'detail': 'Nao foi possivel enviar a foto de perfil. Tente novamente.'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        return Response(
-            {
-                'message': 'User registered successfully.',
-                'user': {
-                    'username': user.username,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                },
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
-
-class LoginView(APIView):
-    authentication_classes = []
-    permission_classes = []
-    throttle_classes = [throttling.ScopedRateThrottle]
-    throttle_scope = 'auth_login'
-
-    def post(self, request, *args, **kwargs):
-        login_value = request.data.get('username', '').strip()
-        password = request.data.get('password', '')
-
-        if not login_value or not password:
-            return Response(
-                {'detail': 'username and password are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user = None
-        password_is_valid = False
-        if '@' in login_value:
-            user = User.objects.filter(email__iexact=login_value).first()
-            password_is_valid = bool(user and user.is_active and user.check_password(password))
-        elif login_value.isdigit():
-            user = User.objects.filter(last_name=login_value).first()
-            password_is_valid = bool(user and user.is_active and user.check_password(password))
-        else:
-            user = authenticate(request, username=login_value, password=password)
-            password_is_valid = user is not None
-
-        if not password_is_valid:
-            return Response(
-                {'detail': 'Invalid credentials.'},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        token, _ = Token.objects.get_or_create(user=user)
-        return Response(
-            {
-                'access_token': token.key,
-                'token': token.key,
-                'token_type': 'bearer',
-                'user': {
-                    'username': user.username,
-                    'email': user.email,
-                    'first_name': user.first_name,
-                    'is_staff': user.is_staff,
-                },
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-class PasswordResetRequestView(APIView):
-    authentication_classes = []
-    permission_classes = []
-    throttle_classes = [throttling.ScopedRateThrottle]
-    throttle_scope = 'password_reset'
-
-    def post(self, request, *args, **kwargs):
-        identifier = request.data.get('email', '') or request.data.get('username', '')
-        identifier = identifier.strip()
-
-        if not identifier:
-            return Response(
-                {'detail': 'email is required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user = User.objects.filter(email__iexact=identifier).first()
-        if user and user.is_active and user.email:
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173').rstrip('/')
-            reset_url = f'{frontend_url}/reset-password?uid={uid}&token={token}'
-
-            send_mail(
-                subject='Redefinicao de senha - Projeto Miranda',
-                message=(
-                    'Recebemos uma solicitacao para redefinir sua senha.\n\n'
-                    f'Acesse este link para criar uma nova senha:\n{reset_url}\n\n'
-                    'Se voce nao solicitou isso, ignore este e-mail.'
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=False,
-            )
-
-        return Response(
-            {'detail': 'If the account exists, a password reset email was sent.'},
-            status=status.HTTP_200_OK,
-        )
-
-
-class PasswordResetConfirmView(APIView):
-    authentication_classes = []
-    permission_classes = []
-    throttle_classes = [throttling.ScopedRateThrottle]
-    throttle_scope = 'password_reset'
-
-    def post(self, request, *args, **kwargs):
-        uid = request.data.get('uid', '')
-        token = request.data.get('token', '')
-        new_password = request.data.get('new_password', '') or request.data.get('password', '')
-
-        if not uid or not token or not new_password:
-            return Response(
-                {'detail': 'uid, token and new_password are required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            user_id = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.get(pk=user_id)
-        except (TypeError, ValueError, OverflowError, UnicodeDecodeError, User.DoesNotExist):
-            user = None
-
-        if user is None or not default_token_generator.check_token(user, token):
-            return Response(
-                {'detail': 'Invalid or expired password reset token.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            validate_password(new_password, user=user)
-        except ValidationError as error:
-            return Response(
-                {'detail': list(error.messages)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user.set_password(new_password)
-        user.save(update_fields=['password'])
-
-        return Response(
-            {'detail': 'Password has been reset successfully.'},
-            status=status.HTTP_200_OK,
-        )
-
-
 class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
@@ -394,10 +98,211 @@ class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset.filter(user=self.request.user)
 
 
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = AuditLogSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return AuditLog.objects.select_related('actor').all()
+
+
+class PrivacyRequestViewSet(viewsets.ModelViewSet):
+    serializer_class = PrivacyRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post', 'patch', 'head', 'options']
+
+    def get_queryset(self):
+        queryset = PrivacyRequest.objects.select_related('user', 'resolved_by').all()
+        if self.request.user.is_staff:
+            return queryset
+        return queryset.filter(user=self.request.user)
+
+    def get_permissions(self):
+        if self.action in ['partial_update', 'complete', 'reject']:
+            return [permissions.IsAdminUser()]
+        return [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        privacy_request = serializer.save(
+            user=user,
+            requester_name=serializer.validated_data.get('requester_name') or user.get_full_name() or user.username,
+            requester_email=serializer.validated_data.get('requester_email') or user.email,
+        )
+        record_audit_log(
+            user,
+            'privacy_request_created',
+            privacy_request,
+            {'request_type': privacy_request.request_type},
+        )
+
+    def perform_update(self, serializer):
+        privacy_request = serializer.save(
+            resolved_by=self.request.user,
+            resolved_at=timezone.now(),
+        )
+        record_audit_log(
+            self.request.user,
+            'privacy_request_updated',
+            privacy_request,
+            {'status': privacy_request.status},
+        )
+
+    @action(detail=True, methods=['post'])
+    def complete(self, request, pk=None):
+        privacy_request = self.get_object()
+        privacy_request.status = PrivacyRequest.STATUS_COMPLETED
+        privacy_request.notes = request.data.get('notes', privacy_request.notes)
+        privacy_request.resolved_by = request.user
+        privacy_request.resolved_at = timezone.now()
+        privacy_request.save(update_fields=['status', 'notes', 'resolved_by', 'resolved_at'])
+        record_audit_log(
+            request.user,
+            'privacy_request_completed',
+            privacy_request,
+            {'request_type': privacy_request.request_type},
+        )
+        return Response(self.get_serializer(privacy_request).data)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        privacy_request = self.get_object()
+        privacy_request.status = PrivacyRequest.STATUS_REJECTED
+        privacy_request.notes = request.data.get('notes', privacy_request.notes)
+        privacy_request.resolved_by = request.user
+        privacy_request.resolved_at = timezone.now()
+        privacy_request.save(update_fields=['status', 'notes', 'resolved_by', 'resolved_at'])
+        record_audit_log(
+            request.user,
+            'privacy_request_rejected',
+            privacy_request,
+            {'request_type': privacy_request.request_type},
+        )
+        return Response(self.get_serializer(privacy_request).data)
+
+
+class DeactivateOwnAccountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        if request.user.is_staff:
+            return Response(
+                {'detail': 'Use a gestao de administradores para desativar contas administrativas.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+        Token.objects.filter(user=user).delete()
+        record_audit_log(user, 'account_deactivated_by_owner', user)
+        return Response(
+            {'detail': 'Conta desativada com sucesso.'},
+            status=status.HTTP_200_OK,
+        )
+
+
+class ManagerViewSet(viewsets.ModelViewSet):
+    serializer_class = ManagerSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return (
+            User.objects
+            .select_related('profile')
+            .filter(Q(is_staff=True) | Q(profile__role=Profile.ROLE_MANAGER))
+            .distinct()
+            .order_by('-is_active', 'username')
+        )
+
+    def perform_create(self, serializer):
+        manager = serializer.save()
+        record_audit_log(self.request.user, 'manager_created', manager)
+
+    def perform_update(self, serializer):
+        manager = serializer.save()
+        record_audit_log(self.request.user, 'manager_updated', manager)
+
+    def destroy(self, request, *args, **kwargs):
+        manager = self.get_object()
+        if self.is_self_action(manager):
+            return Response(
+                {'detail': 'Voce nao pode desativar seu proprio acesso.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        manager.is_active = False
+        manager.save(update_fields=['is_active'])
+        record_audit_log(request.user, 'manager_deactivated', manager)
+        return Response(self.get_serializer(manager).data)
+
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None):
+        manager = self.get_object()
+        if self.is_self_action(manager):
+            return Response(
+                {'detail': 'Voce nao pode desativar seu proprio acesso.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        manager.is_active = False
+        manager.save(update_fields=['is_active'])
+        record_audit_log(request.user, 'manager_deactivated', manager)
+        return Response(self.get_serializer(manager).data)
+
+    @action(detail=True, methods=['post'])
+    def reactivate(self, request, pk=None):
+        manager = self.get_object()
+        manager.is_active = True
+        manager.is_staff = True
+        manager.save(update_fields=['is_active', 'is_staff'])
+        profile, _ = Profile.objects.get_or_create(user=manager)
+        profile.role = Profile.ROLE_MANAGER
+        profile.save(update_fields=['role'])
+        record_audit_log(request.user, 'manager_reactivated', manager)
+        return Response(self.get_serializer(manager).data)
+
+    @action(detail=True, methods=['post'])
+    def revoke(self, request, pk=None):
+        manager = self.get_object()
+        if self.is_self_action(manager):
+            return Response(
+                {'detail': 'Voce nao pode revogar seu proprio acesso.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        manager.is_staff = False
+        manager.save(update_fields=['is_staff'])
+        Token.objects.filter(user=manager).delete()
+
+        profile, _ = Profile.objects.get_or_create(user=manager)
+        profile.role = Profile.ROLE_CITIZEN
+        profile.save(update_fields=['role'])
+        record_audit_log(request.user, 'manager_revoked', manager)
+        return Response(self.get_serializer(manager).data)
+
+    def is_self_action(self, manager):
+        return self.request.user.is_authenticated and manager.id == self.request.user.id
+
+
 class InstitutionViewSet(viewsets.ModelViewSet):
     queryset = Institution.objects.prefetch_related('visual_identity').all()
     serializer_class = InstitutionSerializer
     permission_classes = [IsManagerOrReadOnly]
+
+
+class SegmentViewSet(viewsets.ModelViewSet):
+    queryset = Segment.objects.prefetch_related('users', 'push_devices').all()
+    serializer_class = SegmentSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def perform_create(self, serializer):
+        segment = serializer.save()
+        record_audit_log(self.request.user, 'segment_created', segment)
+
+    def perform_update(self, serializer):
+        segment = serializer.save()
+        record_audit_log(self.request.user, 'segment_updated', segment)
 
 
 class VisualIdentityViewSet(viewsets.ModelViewSet):
@@ -405,6 +310,14 @@ class VisualIdentityViewSet(viewsets.ModelViewSet):
     serializer_class = VisualIdentitySerializer
     permission_classes = [IsManagerOrReadOnly]
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
+
+    def perform_create(self, serializer):
+        visual_identity = serializer.save()
+        record_audit_log(self.request.user, 'visual_identity_created', visual_identity)
+
+    def perform_update(self, serializer):
+        visual_identity = serializer.save()
+        record_audit_log(self.request.user, 'visual_identity_updated', visual_identity)
 
 
 class AnnouncementViewSet(viewsets.ModelViewSet):
@@ -415,7 +328,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = (
             Announcement.objects.select_related('author', 'institution')
-            .prefetch_related('attachments')
+            .prefetch_related('attachments', 'segments')
             .all()
         )
         if self.request.user.is_authenticated and self.request.user.is_staff:
@@ -423,43 +336,42 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         return queryset.filter(status=Announcement.STATUS_PUBLISHED)
 
     def perform_create(self, serializer):
+        files = self.get_attachment_files()
+        self.validate_attachments(files)
         announcement = serializer.save(author=self.request.user)
-        self.create_attachments(announcement)
+        self.create_attachments(announcement, files)
+        record_audit_log(self.request.user, 'announcement_created', announcement)
         if announcement.status == Announcement.STATUS_PUBLISHED:
-            self.create_pending_delivery_logs(announcement)
+            self.push_dispatch_result = dispatch_published_announcement(announcement)
 
     def perform_update(self, serializer):
+        files = self.get_attachment_files()
+        self.validate_attachments(files)
         was_published = serializer.instance.status == Announcement.STATUS_PUBLISHED
         announcement = serializer.save()
-        self.create_attachments(announcement)
+        self.create_attachments(announcement, files)
+        record_audit_log(self.request.user, 'announcement_updated', announcement)
         if not was_published and announcement.status == Announcement.STATUS_PUBLISHED:
-            self.create_pending_delivery_logs(announcement)
+            self.push_dispatch_result = dispatch_published_announcement(announcement)
 
-    def create_attachments(self, announcement):
+    def get_attachment_files(self):
         files = []
         files.extend(self.request.FILES.getlist('attachments'))
         files.extend(self.request.FILES.getlist('files'))
+        return files
+
+    def validate_attachments(self, files):
         for uploaded_file in files:
             validate_attachment(uploaded_file)
+
+    def create_attachments(self, announcement, files):
+        for uploaded_file in files:
             Attachment.objects.create(
                 announcement=announcement,
                 file=uploaded_file,
                 original_name=uploaded_file.name,
                 file_type=attachment_type(uploaded_file),
             )
-
-    def create_pending_delivery_logs(self, announcement):
-        devices = PushDevice.objects.filter(is_active=True).select_related('user')
-        logs = [
-            DeliveryLog(
-                announcement=announcement,
-                device=device,
-                recipient_user=device.user,
-                status=DeliveryLog.STATUS_PENDING,
-            )
-            for device in devices
-        ]
-        DeliveryLog.objects.bulk_create(logs, ignore_conflicts=True)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def publish(self, request, pk=None):
@@ -469,8 +381,13 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         announcement.published_at = announcement.published_at or timezone.now()
         announcement.save(update_fields=['status', 'published_at', 'updated_at'])
         if not was_published:
-            self.create_pending_delivery_logs(announcement)
-        return Response(self.get_serializer(announcement).data)
+            record_audit_log(request.user, 'announcement_published', announcement)
+            self.push_dispatch_result = dispatch_published_announcement(announcement)
+
+        data = self.get_serializer(announcement).data
+        if hasattr(self, 'push_dispatch_result'):
+            data['push_dispatch'] = self.push_dispatch_result
+        return Response(data)
 
     @action(
         detail=True,
@@ -481,8 +398,19 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
     )
     def dispatch_push(self, request, pk=None):
         announcement = self.get_object()
-        self.create_pending_delivery_logs(announcement)
+        create_pending_delivery_logs(announcement)
         result = PushNotificationService().dispatch_pending_for_announcement(announcement)
+        record_audit_log(
+            request.user,
+            'announcement_push_dispatched',
+            announcement,
+            {
+                'configured': result['configured'],
+                'sent': result['sent'],
+                'failed': result['failed'],
+                'pending': result['pending'],
+            },
+        )
         return Response(
             {
                 'detail': 'Delivery dispatch processed.',
@@ -499,14 +427,17 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         announcement = self.get_object()
         logs = announcement.delivery_logs.all()
         failed_logs = logs.filter(status=DeliveryLog.STATUS_FAILED)
+        total = logs.count()
+        viewed = logs.filter(status=DeliveryLog.STATUS_VIEWED).count()
         return Response(
             {
                 'announcement': announcement.id,
                 'pending': logs.filter(status=DeliveryLog.STATUS_PENDING).count(),
                 'sent': logs.filter(status=DeliveryLog.STATUS_SENT).count(),
                 'failed': failed_logs.count(),
-                'viewed': logs.filter(status=DeliveryLog.STATUS_VIEWED).count(),
-                'total': logs.count(),
+                'viewed': viewed,
+                'total': total,
+                'view_rate': round((viewed / total) * 100, 2) if total else 0.0,
                 'failed_errors': [
                     {
                         'log_id': log.id,
@@ -518,6 +449,64 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
                 ],
             }
         )
+
+    @action(
+        detail=True,
+        methods=['post'],
+        permission_classes=[permissions.AllowAny],
+        url_path='mark-viewed',
+        url_name='mark-viewed',
+    )
+    def mark_viewed(self, request, pk=None):
+        announcement = self.get_object()
+        delivery_log_id = request.data.get('delivery_log_id') or request.data.get('log_id')
+        device_token = request.data.get('device_token') or request.data.get('token')
+
+        logs = DeliveryLog.objects.filter(announcement=announcement).select_related('device')
+        if delivery_log_id:
+            logs = logs.filter(id=delivery_log_id)
+        elif request.user.is_authenticated:
+            logs = logs.filter(recipient_user=request.user)
+        elif device_token:
+            logs = logs.filter(device__token=device_token)
+        else:
+            return Response(
+                {'detail': 'Authentication, delivery_log_id or device_token is required.'},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        log = logs.order_by('-created_at').first()
+        if not log:
+            return Response(
+                {'detail': 'Delivery log not found for this announcement.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not self.can_mark_log_viewed(request, log, device_token):
+            return Response({'detail': 'Not allowed.'}, status=status.HTTP_403_FORBIDDEN)
+
+        self.mark_log_viewed(log)
+        return Response(
+            {
+                'detail': 'Announcement marked as viewed.',
+                'delivery_log': DeliveryLogSerializer(log).data,
+            }
+        )
+
+    def can_mark_log_viewed(self, request, log, device_token):
+        if request.user.is_authenticated:
+            if request.user.is_staff or log.recipient_user_id == request.user.id:
+                return True
+
+        return bool(device_token and log.device and log.device.token == device_token)
+
+    def mark_log_viewed(self, log):
+        if log.status == DeliveryLog.STATUS_VIEWED and log.viewed_at:
+            return
+
+        log.status = DeliveryLog.STATUS_VIEWED
+        log.viewed_at = timezone.now()
+        log.save(update_fields=['status', 'viewed_at'])
 
 
 class AttachmentViewSet(viewsets.ModelViewSet):
