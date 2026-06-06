@@ -7,6 +7,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.db import transaction
+from django.db.models import Q
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import parsers, status, throttling
@@ -58,13 +59,19 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if User.objects.filter(username=username).exists():
+        existing_users = list(
+            User.objects
+            .filter(Q(username=username) | Q(email=email))
+            .values('username', 'email')[:2]
+        )
+
+        if any(user['username'] == username for user in existing_users):
             return Response(
                 {'detail': 'username already exists.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if User.objects.filter(email=email).exists():
+        if any(user['email'] == email for user in existing_users):
             return Response(
                 {'detail': 'email already exists.'},
                 status=status.HTTP_400_BAD_REQUEST,
