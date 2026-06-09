@@ -13,10 +13,10 @@ export const ProtectedRoute: React.FC = () => {
   }
 
   const userObj = JSON.parse(storedUser);
-  const usuarioLogadoId = userObj?.id || "u1"; 
+  const usuarioLogadoId = userObj?.id || "u1";
 
   const permissoesSalvas = localStorage.getItem(`permissoes_${usuarioLogadoId}`);
-  
+
   const permissoes = permissoesSalvas ? JSON.parse(permissoesSalvas) : {
     controlAcess: false,
     announcement: false,
@@ -34,18 +34,17 @@ export const ProtectedRoute: React.FC = () => {
       </div>
     );
   }
- 
+
   if (location.pathname === '/controle-acesso' && !permissoes.controlAcess) {
-    return <Navigate to={AppRoutes.COMUNICADOS} replace />;
+    return <Navigate to="/" replace />;
   }
 
   if (location.pathname === '/edicao-comunicados' && !permissoes.announcement) {
-    return <Navigate to={AppRoutes.COMUNICADOS} replace />;
+    return <Navigate to="/" replace />;
   }
 
-  // Tentativa de acessar o Módulo de Identificação Visual
   if (location.pathname === '/configuracoes/visual' && !permissoes.idtVisual) {
-    return <Navigate to={AppRoutes.COMUNICADOS} replace />;
+    return <Navigate to="/" replace />;
   }
 
   return (

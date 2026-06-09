@@ -9,16 +9,16 @@ export const useControleAcesso = () => {
     useEffect(() => {
         const carregarUsuarios = async () => {
             try {
-                await new Promise(resolve => setTimeout(resolve, 600));
+                await new Promise(resolve => setTimeout(resolve, 400));
 
-                const mockUsuarios: UsuarioAcesso[] = [
+                const listaBase = [
                     {
                         id: "u1",
                         nome: "Carlos Eduardo",
                         email: "carlos.eduardo@nexa.com",
                         foto: null,
                         roleAtual: "colaborador",
-                        permissoes: { controlAcess: false, announcement: true, idtVisual: false, isAdmin: false }
+                        permissoesPadrao: { controlAcess: false, announcement: true, idtVisual: false, isAdmin: false }
                     },
                     {
                         id: "u2",
@@ -26,7 +26,7 @@ export const useControleAcesso = () => {
                         email: "mariana.costa@nexa.com",
                         foto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150",
                         roleAtual: "gestor",
-                        permissoes: { controlAcess: true, announcement: true, idtVisual: true, isAdmin: true }
+                        permissoesPadrao: { controlAcess: true, announcement: true, idtVisual: true, isAdmin: true }
                     },
                     {
                         id: "u3",
@@ -34,11 +34,24 @@ export const useControleAcesso = () => {
                         email: "roberto.alves@nexa.com",
                         foto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150",
                         roleAtual: "colaborador",
-                        permissoes: { controlAcess: false, announcement: false, idtVisual: false, isAdmin: false }
+                        permissoesPadrao: { controlAcess: false, announcement: false, idtVisual: false, isAdmin: false }
                     }
                 ];
 
-                setUsuarios(mockUsuarios);
+                const usuariosProcessados: UsuarioAcesso[] = listaBase.map(u => {
+                    const salvas = localStorage.getItem(`permissoes_${u.id}`);
+                    const roleSalvo = localStorage.getItem(`user_role_${u.id}`);
+                    return {
+                        id: u.id,
+                        nome: u.nome,
+                        email: u.email,
+                        foto: u.foto,
+                        roleAtual: (roleSalvo as 'gestor' | 'colaborador') || u.roleAtual,
+                        permissoes: salvas ? JSON.parse(salvas) : u.permissoesPadrao
+                    };
+                });
+
+                setUsuarios(usuariosProcessados);
             } catch (error) {
                 console.error("Erro ao carregar controle de acessos:", error);
             } finally {
@@ -58,12 +71,14 @@ export const useControleAcesso = () => {
             if (chavePermissao === 'isAdmin') {
                 const novoValorAdmin = !novasPermissoes.isAdmin;
                 novasPermissoes.isAdmin = novoValorAdmin;
-
                 novasPermissoes.controlAcess = novoValorAdmin;
                 novasPermissoes.announcement = novoValorAdmin;
                 novasPermissoes.idtVisual = novoValorAdmin;
             } else {
                 novasPermissoes[chavePermissao] = !novasPermissoes[chavePermissao];
+                if (!novasPermissoes[chavePermissao]) {
+                    novasPermissoes.isAdmin = false;
+                }
             }
 
             const novoRole = novasPermissoes.isAdmin ? 'gestor' : 'colaborador';
@@ -81,12 +96,19 @@ export const useControleAcesso = () => {
         if (!usuarioAlvo) return;
 
         try {
-            console.log(`Enviando ao Django permissões do usuário ${usuarioId}:`, usuarioAlvo.permissoes);
-
             localStorage.setItem(`permissoes_${usuarioId}`, JSON.stringify(usuarioAlvo.permissoes));
             localStorage.setItem(`user_role_${usuarioId}`, usuarioAlvo.roleAtual);
 
-            alert(`Permissões de ${usuarioAlvo.nome} atualizadas com sucesso no sistema Nexa!`);
+            const storedUser = localStorage.getItem('user_data');
+            if (storedUser) {
+                const userObj = JSON.parse(storedUser);
+                if (userObj.id === usuarioId) {
+                    userObj.roleAtual = usuarioAlvo.roleAtual;
+                    localStorage.setItem('user_data', JSON.stringify(userObj));
+                }
+            }
+
+            alert(`Permissões de ${usuarioAlvo.nome} aplicadas com sucesso no ecossistema Nexa!`);
         } catch {
             alert("Erro ao salvar alterações no servidor.");
         }
