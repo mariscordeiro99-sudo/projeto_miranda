@@ -12,6 +12,7 @@ psycopg2-binary==2.9.9
 
 # API e Documentação
 djangorestframework
+django-filter
 django-cors-headers
 drf-spectacular
 drf-spectacular-sidecar
@@ -22,5 +23,8 @@ pillow
 requests
 firebase-admin==6.5.0
 cloudinary
+django-redis
+celery
+python-json-logger
 
 whitenoise==6.6.0

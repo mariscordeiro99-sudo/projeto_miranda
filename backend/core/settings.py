@@ -15,6 +15,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
 import cloudinary
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -65,27 +66,27 @@ def db_ca_cert_path():
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv(
-    'SECRET_KEY',
-    'django-insecure-5rt^!x9lk$08-syckix(^7et2&jtsoub5p)!qz5efrlss9d(!r',
-)
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_bool('DEBUG', True)
+DEBUG = env_bool('DEBUG', False)
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    'projeto-miranda.onrender.com',
-]
-ALLOWED_HOSTS += env_list('ALLOWED_HOSTS')
+# SECURITY WARNING: keep the secret key used in production secret.
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-dev-only-set-secret-key-in-env'
+    else:
+        raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG is false.')
+
+default_allowed_hosts = 'localhost,127.0.0.1' if DEBUG else ''
+ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', default_allowed_hosts)
 
 render_hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME')
 if render_hostname:
     ALLOWED_HOSTS.append(render_hostname)
 
 ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
+if not DEBUG and not ALLOWED_HOSTS:
+    raise ImproperlyConfigured('ALLOWED_HOSTS must be set when DEBUG is false.')
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = env_bool('SECURE_SSL_REDIRECT', not DEBUG)
@@ -94,6 +95,30 @@ CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', not DEBUG)
 SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '0' if DEBUG else '31536000'))
 SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', not DEBUG)
 SECURE_HSTS_PRELOAD = env_bool('SECURE_HSTS_PRELOAD', not DEBUG)
+SESSION_COOKIE_AGE = int(os.getenv('SESSION_COOKIE_AGE', '1209600' if DEBUG else '28800'))
+SESSION_EXPIRE_AT_BROWSER_CLOSE = env_bool('SESSION_EXPIRE_AT_BROWSER_CLOSE', not DEBUG)
+MANAGER_TOKEN_TTL_SECONDS = int(os.getenv('MANAGER_TOKEN_TTL_SECONDS', '28800'))
+MANAGER_TOKEN_ROTATE_ON_LOGIN = env_bool('MANAGER_TOKEN_ROTATE_ON_LOGIN', True)
+
+if not DEBUG:
+    required_secure_settings = {
+        'SECURE_SSL_REDIRECT': SECURE_SSL_REDIRECT,
+        'SESSION_COOKIE_SECURE': SESSION_COOKIE_SECURE,
+        'CSRF_COOKIE_SECURE': CSRF_COOKIE_SECURE,
+        'SECURE_HSTS_SECONDS': SECURE_HSTS_SECONDS > 0,
+    }
+    disabled_settings = [
+        name for name, enabled in required_secure_settings.items() if not enabled
+    ]
+    if disabled_settings:
+        raise ImproperlyConfigured(
+            'Production security settings must be enabled: '
+            + ', '.join(disabled_settings)
+        )
+    if MANAGER_TOKEN_TTL_SECONDS <= 0:
+        raise ImproperlyConfigured(
+            'MANAGER_TOKEN_TTL_SECONDS must be greater than zero when DEBUG is false.'
+        )
 
 
 # Application definition
@@ -107,6 +132,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'django_filters',
     'drf_spectacular',
     'corsheaders',
     'cloudinary',
@@ -122,7 +148,25 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'DEFAULT_PAGINATION_CLASS': 'api.pagination.StandardResultsSetPagination',
+    'PAGE_SIZE': int(os.getenv('API_PAGE_SIZE', '20')),
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
+    'DEFAULT_VERSION': 'v1',
+    'ALLOWED_VERSIONS': ['v1'],
+    'VERSION_PARAM': 'version',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
     'DEFAULT_THROTTLE_RATES': {
+        'anon': os.getenv('THROTTLE_ANON_RATE', '100/hour'),
+        'user': os.getenv('THROTTLE_USER_RATE', '1000/hour'),
         'auth_login': os.getenv('AUTH_LOGIN_THROTTLE_RATE', '5/minute'),
         'auth_register': os.getenv('AUTH_REGISTER_THROTTLE_RATE', '10/hour'),
         'password_reset': os.getenv('PASSWORD_RESET_THROTTLE_RATE', '5/hour'),
@@ -144,6 +188,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'api.middleware.RequestContextMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -256,17 +301,19 @@ cloudinary.config(
 )
 CLOUDINARY_MEDIA_FOLDER = os.getenv('CLOUDINARY_MEDIA_FOLDER', 'nexa').strip('/')
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:5177',
-    'http://127.0.0.1:5177',
-]
-CORS_ALLOWED_ORIGINS += env_list('CORS_ALLOWED_ORIGINS')
+default_cors_origins = (
+    'http://localhost:5173,http://127.0.0.1:5173,'
+    'http://localhost:5177,http://127.0.0.1:5177'
+    if DEBUG
+    else ''
+)
+CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS', default_cors_origins)
 
-CORS_ALLOW_ALL_ORIGINS = env_bool('CORS_ALLOW_ALL_ORIGINS', DEBUG)
+CORS_ALLOW_ALL_ORIGINS = env_bool('CORS_ALLOW_ALL_ORIGINS', False)
+if CORS_ALLOW_ALL_ORIGINS and not DEBUG:
+    raise ImproperlyConfigured('CORS_ALLOW_ALL_ORIGINS cannot be true when DEBUG is false.')
 
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173' if DEBUG else '')
 if FRONTEND_URL:
     CORS_ALLOWED_ORIGINS.append(FRONTEND_URL.rstrip('/'))
 
@@ -300,8 +347,129 @@ FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', '')
 FIREBASE_CLIENT_EMAIL = os.getenv('FIREBASE_CLIENT_EMAIL', '')
 FIREBASE_PRIVATE_KEY = os.getenv('FIREBASE_PRIVATE_KEY', '')
 PUSH_DISPATCH_ON_PUBLISH = env_bool('PUSH_DISPATCH_ON_PUBLISH', True)
+PUSH_DISPATCH_ASYNC = env_bool(
+    'PUSH_DISPATCH_ASYNC',
+    bool(os.getenv('CELERY_BROKER_URL') or os.getenv('REDIS_URL')),
+)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+REDIS_URL = os.getenv('REDIS_URL', '')
+CACHE_TIMEOUT = int(os.getenv('CACHE_TIMEOUT', '300'))
+
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'IGNORE_EXCEPTIONS': True,
+            },
+            'TIMEOUT': CACHE_TIMEOUT,
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'miranda-default-cache',
+            'TIMEOUT': CACHE_TIMEOUT,
+        }
+    }
+
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', REDIS_URL or 'memory://')
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', REDIS_URL or 'cache+memory://')
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_ALWAYS_EAGER = env_bool(
+    'CELERY_TASK_ALWAYS_EAGER',
+    not bool(os.getenv('CELERY_BROKER_URL') or REDIS_URL),
+)
+CELERY_TASK_EAGER_PROPAGATES = env_bool('CELERY_TASK_EAGER_PROPAGATES', DEBUG)
+CELERY_TASK_IGNORE_RESULT = env_bool('CELERY_TASK_IGNORE_RESULT', True)
+
+if not DEBUG and PUSH_DISPATCH_ASYNC and CELERY_BROKER_URL == 'memory://':
+    raise ImproperlyConfigured(
+        'PUSH_DISPATCH_ASYNC requires REDIS_URL or CELERY_BROKER_URL in production.'
+    )
+
+CELERY_BEAT_SCHEDULE = {
+    'retry-failed-deliveries-hourly': {
+        'task': 'api.tasks.retry_failed_deliveries',
+        'schedule': 60 * 60,
+    },
+    'cleanup-old-delivery-logs-daily': {
+        'task': 'api.tasks.cleanup_old_delivery_logs',
+        'schedule': 60 * 60 * 24,
+    },
+    'mark-stale-deliveries-failed': {
+        'task': 'api.tasks.mark_stale_deliveries_as_failed',
+        'schedule': 60 * 30,
+    },
+    'deactivate-invalid-push-devices': {
+        'task': 'api.tasks.deactivate_invalid_push_devices',
+        'schedule': 60 * 60 * 6,
+    },
+}
+
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+DJANGO_LOG_LEVEL = os.getenv('DJANGO_LOG_LEVEL', LOG_LEVEL)
+API_LOG_LEVEL = os.getenv('API_LOG_LEVEL', LOG_LEVEL)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'filters': {
+        'request_context': {
+            '()': 'api.logging_context.RequestContextFilter',
+        },
+    },
+    'formatters': {
+        'console': {
+            'format': '%(levelname)s %(name)s %(message)s',
+        },
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'format': (
+                '%(asctime)s %(levelname)s %(name)s %(message)s '
+                '%(pathname)s %(lineno)d %(request_id)s %(user_id)s'
+            ),
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'console',
+            'filters': ['request_context'],
+        },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOG_DIR / 'django.log'),
+            'maxBytes': 10 * 1024 * 1024,
+            'backupCount': 5,
+            'formatter': 'json',
+            'filters': ['request_context'],
+        },
+    },
+    'root': {
+        'handlers': ['console'] if DEBUG else ['console', 'file'],
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'] if DEBUG else ['console', 'file'],
+            'level': DJANGO_LOG_LEVEL,
+            'propagate': False,
+        },
+        'api': {
+            'handlers': ['console'] if DEBUG else ['console', 'file'],
+            'level': API_LOG_LEVEL,
+            'propagate': False,
+        },
+    },
+}
 
 STORAGES = {
     "default": {

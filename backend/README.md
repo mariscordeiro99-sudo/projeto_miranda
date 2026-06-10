@@ -51,6 +51,8 @@ O backend dispara push automaticamente quando um comunicado e publicado. Para at
 
 ```env
 PUSH_DISPATCH_ON_PUBLISH=true
+PUSH_DISPATCH_ASYNC=true
+REDIS_URL=redis://...
 FIREBASE_ENABLED=true
 FIREBASE_PROJECT_ID=seu-projeto-firebase
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@seu-projeto.iam.gserviceaccount.com
@@ -61,6 +63,18 @@ Se `FIREBASE_ENABLED=false` ou as credenciais estiverem ausentes, o backend cria
 
 ```http
 POST /api/announcements/{id}/dispatch/
+```
+
+Com `PUSH_DISPATCH_ASYNC=true`, a publicacao do comunicado apenas enfileira a entrega. Rode um worker para processar os envios:
+
+```bash
+celery -A core worker --loglevel=info
+```
+
+Para as rotinas periodicas de retry, limpeza de logs antigos e marcacao de entregas pendentes antigas, rode tambem:
+
+```bash
+celery -A core beat --loglevel=info
 ```
 
 ## 7. Gestao de administradores
@@ -88,6 +102,15 @@ Criacao minima:
 ```
 
 `deactivate` bloqueia o login do gestor. `revoke` remove o acesso administrativo, apaga tokens ativos e transforma o perfil em cidadao.
+
+Politica de token para gestores:
+
+```env
+MANAGER_TOKEN_TTL_SECONDS=28800
+MANAGER_TOKEN_ROTATE_ON_LOGIN=true
+```
+
+Gestores recebem token novo a cada login. Tokens expirados sao recusados e revogados automaticamente. Reset de senha tambem revoga tokens existentes.
 
 ## 8. LGPD e auditoria
 Administradores podem consultar trilhas de auditoria pela API:

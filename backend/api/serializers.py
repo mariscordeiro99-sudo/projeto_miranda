@@ -81,7 +81,7 @@ class ManagerSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'is_staff', 'role', 'date_joined']
 
-    def get_role(self, obj):
+    def get_role(self, obj) -> str | None:
         profile = getattr(obj, 'profile', None)
         return profile.role if profile else None
 
@@ -221,10 +221,10 @@ class SegmentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_at', 'updated_at', 'users_count', 'push_devices_count']
 
-    def get_users_count(self, obj):
+    def get_users_count(self, obj) -> int:
         return obj.users.count()
 
-    def get_push_devices_count(self, obj):
+    def get_push_devices_count(self, obj) -> int:
         return obj.push_devices.count()
 
 

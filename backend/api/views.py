@@ -49,10 +49,24 @@ class IsManagerOrReadOnly(permissions.BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.is_staff)
 
 
+class NoDestroyModelViewSet(viewsets.ModelViewSet):
+    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
+
+
 class HelloView(APIView):
     permission_classes = [permissions.AllowAny]
 
-    def get(self, request):
+    @extend_schema(
+        responses=inline_serializer(
+            name='HelloResponse',
+            fields={
+                'message': serializers.CharField(),
+                'status': serializers.CharField(),
+                'version': serializers.CharField(),
+            },
+        )
+    )
+    def get(self, request, *args, **kwargs):
         return Response({
             'message': 'Olá do backend Django! A comunicação está funcionando.',
             'status': 'healthy',
@@ -77,22 +91,31 @@ class DashboardReportView(APIView):
             },
         )
     )
-    def get(self, request):
+    def get(self, request, *args, **kwargs):
         return Response(build_dashboard_report())
 
 
-class DocumentViewSet(viewsets.ModelViewSet):
+class DocumentViewSet(NoDestroyModelViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     permission_classes = [IsManagerOrReadOnly]
+    search_fields = ['title', 'content']
+    ordering_fields = ['title', 'created_at']
+    ordering = ['-created_at']
 
 
 class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filterset_fields = ['role', 'user']
+    search_fields = ['user__username', 'user__email', 'user__first_name', 'phone_number']
+    ordering_fields = ['created_at', 'updated_at', 'user__username']
+    ordering = ['-created_at']
 
     def get_queryset(self):
         queryset = Profile.objects.select_related('user').all()
+        if getattr(self, 'swagger_fake_view', False) or not self.request.user.is_authenticated:
+            return queryset.none()
         if self.request.user.is_staff:
             return queryset
         return queryset.filter(user=self.request.user)
@@ -101,6 +124,10 @@ class ProfileViewSet(viewsets.ReadOnlyModelViewSet):
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditLogSerializer
     permission_classes = [permissions.IsAdminUser]
+    filterset_fields = ['action', 'target_type', 'actor']
+    search_fields = ['action', 'actor_username', 'target_repr', 'target_id']
+    ordering_fields = ['created_at', 'action', 'target_type', 'actor_username']
+    ordering = ['-created_at']
 
     def get_queryset(self):
         return AuditLog.objects.select_related('actor').all()
@@ -110,9 +137,15 @@ class PrivacyRequestViewSet(viewsets.ModelViewSet):
     serializer_class = PrivacyRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
+    filterset_fields = ['request_type', 'status', 'user', 'resolved_by']
+    search_fields = ['requester_name', 'requester_email', 'notes']
+    ordering_fields = ['created_at', 'resolved_at', 'status', 'request_type']
+    ordering = ['-created_at']
 
     def get_queryset(self):
         queryset = PrivacyRequest.objects.select_related('user', 'resolved_by').all()
+        if getattr(self, 'swagger_fake_view', False) or not self.request.user.is_authenticated:
+            return queryset.none()
         if self.request.user.is_staff:
             return queryset
         return queryset.filter(user=self.request.user)
@@ -149,7 +182,7 @@ class PrivacyRequestViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=['post'])
-    def complete(self, request, pk=None):
+    def complete(self, request, pk=None, **kwargs):
         privacy_request = self.get_object()
         privacy_request.status = PrivacyRequest.STATUS_COMPLETED
         privacy_request.notes = request.data.get('notes', privacy_request.notes)
@@ -165,7 +198,7 @@ class PrivacyRequestViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(privacy_request).data)
 
     @action(detail=True, methods=['post'])
-    def reject(self, request, pk=None):
+    def reject(self, request, pk=None, **kwargs):
         privacy_request = self.get_object()
         privacy_request.status = PrivacyRequest.STATUS_REJECTED
         privacy_request.notes = request.data.get('notes', privacy_request.notes)
@@ -184,7 +217,14 @@ class PrivacyRequestViewSet(viewsets.ModelViewSet):
 class DeactivateOwnAccountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request):
+    @extend_schema(
+        request=None,
+        responses=inline_serializer(
+            name='DeactivateOwnAccountResponse',
+            fields={'detail': serializers.CharField()},
+        )
+    )
+    def post(self, request, *args, **kwargs):
         if request.user.is_staff:
             return Response(
                 {'detail': 'Use a gestao de administradores para desativar contas administrativas.'},
@@ -205,6 +245,10 @@ class DeactivateOwnAccountView(APIView):
 class ManagerViewSet(viewsets.ModelViewSet):
     serializer_class = ManagerSerializer
     permission_classes = [permissions.IsAdminUser]
+    filterset_fields = ['is_active', 'is_staff', 'profile__role']
+    search_fields = ['username', 'email', 'first_name', 'last_name', 'profile__phone_number']
+    ordering_fields = ['username', 'email', 'first_name', 'is_active', 'date_joined']
+    ordering = ['-is_active', 'username']
 
     def get_queryset(self):
         return (
@@ -237,7 +281,7 @@ class ManagerViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(manager).data)
 
     @action(detail=True, methods=['post'])
-    def deactivate(self, request, pk=None):
+    def deactivate(self, request, pk=None, **kwargs):
         manager = self.get_object()
         if self.is_self_action(manager):
             return Response(
@@ -251,7 +295,7 @@ class ManagerViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(manager).data)
 
     @action(detail=True, methods=['post'])
-    def reactivate(self, request, pk=None):
+    def reactivate(self, request, pk=None, **kwargs):
         manager = self.get_object()
         manager.is_active = True
         manager.is_staff = True
@@ -263,7 +307,7 @@ class ManagerViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(manager).data)
 
     @action(detail=True, methods=['post'])
-    def revoke(self, request, pk=None):
+    def revoke(self, request, pk=None, **kwargs):
         manager = self.get_object()
         if self.is_self_action(manager):
             return Response(
@@ -285,16 +329,24 @@ class ManagerViewSet(viewsets.ModelViewSet):
         return self.request.user.is_authenticated and manager.id == self.request.user.id
 
 
-class InstitutionViewSet(viewsets.ModelViewSet):
+class InstitutionViewSet(NoDestroyModelViewSet):
     queryset = Institution.objects.prefetch_related('visual_identity').all()
     serializer_class = InstitutionSerializer
     permission_classes = [IsManagerOrReadOnly]
+    filterset_fields = ['kind', 'is_active']
+    search_fields = ['name', 'official_email', 'phone_number']
+    ordering_fields = ['name', 'kind', 'is_active', 'created_at', 'updated_at']
+    ordering = ['name']
 
 
-class SegmentViewSet(viewsets.ModelViewSet):
+class SegmentViewSet(NoDestroyModelViewSet):
     queryset = Segment.objects.prefetch_related('users', 'push_devices').all()
     serializer_class = SegmentSerializer
     permission_classes = [permissions.IsAdminUser]
+    filterset_fields = ['is_active']
+    search_fields = ['name', 'slug', 'description']
+    ordering_fields = ['name', 'slug', 'created_at', 'updated_at']
+    ordering = ['name']
 
     def perform_create(self, serializer):
         segment = serializer.save()
@@ -305,11 +357,15 @@ class SegmentViewSet(viewsets.ModelViewSet):
         record_audit_log(self.request.user, 'segment_updated', segment)
 
 
-class VisualIdentityViewSet(viewsets.ModelViewSet):
+class VisualIdentityViewSet(NoDestroyModelViewSet):
     queryset = VisualIdentity.objects.select_related('institution').all()
     serializer_class = VisualIdentitySerializer
     permission_classes = [IsManagerOrReadOnly]
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
+    filterset_fields = ['institution']
+    search_fields = ['institution__name']
+    ordering_fields = ['updated_at', 'institution__name']
+    ordering = ['-updated_at']
 
     def perform_create(self, serializer):
         visual_identity = serializer.save()
@@ -320,10 +376,21 @@ class VisualIdentityViewSet(viewsets.ModelViewSet):
         record_audit_log(self.request.user, 'visual_identity_updated', visual_identity)
 
 
-class AnnouncementViewSet(viewsets.ModelViewSet):
+class AnnouncementViewSet(NoDestroyModelViewSet):
     serializer_class = AnnouncementSerializer
     permission_classes = [IsManagerOrReadOnly]
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
+    filterset_fields = ['status', 'institution', 'author', 'pinned', 'segments']
+    search_fields = ['title', 'content', 'institution__name', 'author__username']
+    ordering_fields = [
+        'title',
+        'status',
+        'pinned',
+        'published_at',
+        'created_at',
+        'updated_at',
+    ]
+    ordering = ['-pinned', '-published_at', '-created_at']
 
     def get_queryset(self):
         queryset = (
@@ -374,7 +441,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
             )
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
-    def publish(self, request, pk=None):
+    def publish(self, request, pk=None, **kwargs):
         announcement = self.get_object()
         was_published = announcement.status == Announcement.STATUS_PUBLISHED
         announcement.status = Announcement.STATUS_PUBLISHED
@@ -396,7 +463,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         url_path='dispatch',
         url_name='dispatch',
     )
-    def dispatch_push(self, request, pk=None):
+    def dispatch_push(self, request, pk=None, **kwargs):
         announcement = self.get_object()
         create_pending_delivery_logs(announcement)
         result = PushNotificationService().dispatch_pending_for_announcement(announcement)
@@ -423,7 +490,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.IsAdminUser])
-    def stats(self, request, pk=None):
+    def stats(self, request, pk=None, **kwargs):
         announcement = self.get_object()
         logs = announcement.delivery_logs.all()
         failed_logs = logs.filter(status=DeliveryLog.STATUS_FAILED)
@@ -457,7 +524,7 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         url_path='mark-viewed',
         url_name='mark-viewed',
     )
-    def mark_viewed(self, request, pk=None):
+    def mark_viewed(self, request, pk=None, **kwargs):
         announcement = self.get_object()
         delivery_log_id = request.data.get('delivery_log_id') or request.data.get('log_id')
         device_token = request.data.get('device_token') or request.data.get('token')
@@ -509,10 +576,14 @@ class AnnouncementViewSet(viewsets.ModelViewSet):
         log.save(update_fields=['status', 'viewed_at'])
 
 
-class AttachmentViewSet(viewsets.ModelViewSet):
+class AttachmentViewSet(NoDestroyModelViewSet):
     serializer_class = AttachmentSerializer
     permission_classes = [IsManagerOrReadOnly]
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+    filterset_fields = ['announcement', 'file_type']
+    search_fields = ['original_name', 'announcement__title']
+    ordering_fields = ['uploaded_at', 'original_name', 'file_type']
+    ordering = ['-uploaded_at']
 
     def get_queryset(self):
         queryset = Attachment.objects.select_related('announcement').all()
@@ -535,6 +606,10 @@ class AttachmentViewSet(viewsets.ModelViewSet):
 class PushDeviceViewSet(viewsets.ModelViewSet):
     serializer_class = PushDeviceSerializer
     parser_classes = [parsers.JSONParser, parsers.FormParser]
+    filterset_fields = ['platform', 'is_active', 'user']
+    search_fields = ['token', 'user__username', 'user__email']
+    ordering_fields = ['platform', 'is_active', 'created_at', 'updated_at']
+    ordering = ['-updated_at']
 
     def get_queryset(self):
         queryset = PushDevice.objects.select_related('user').all()
@@ -566,9 +641,13 @@ class PushDeviceViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class DeliveryLogViewSet(viewsets.ModelViewSet):
+class DeliveryLogViewSet(NoDestroyModelViewSet):
     serializer_class = DeliveryLogSerializer
     permission_classes = [permissions.IsAdminUser]
+    filterset_fields = ['status', 'channel', 'announcement', 'device', 'recipient_user']
+    search_fields = ['error_message', 'announcement__title', 'device__token', 'recipient_user__username']
+    ordering_fields = ['created_at', 'sent_at', 'viewed_at', 'status', 'channel']
+    ordering = ['-created_at']
 
     def get_queryset(self):
         return DeliveryLog.objects.select_related(
@@ -578,7 +657,7 @@ class DeliveryLogViewSet(viewsets.ModelViewSet):
         ).all()
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
-    def mark_viewed(self, request, pk=None):
+    def mark_viewed(self, request, pk=None, **kwargs):
         log = self.get_object()
         if not request.user.is_staff and log.recipient_user_id != request.user.id:
             return Response({'detail': 'Not allowed.'}, status=status.HTTP_403_FORBIDDEN)

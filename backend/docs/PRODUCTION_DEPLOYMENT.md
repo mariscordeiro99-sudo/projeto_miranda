@@ -37,6 +37,14 @@ O `backend/build.sh` executa:
 3. cria/atualiza admin se as variaveis `DJANGO_SUPERUSER_*` existirem;
 4. roda `python manage.py collectstatic --noinput`.
 
+O `render.yaml` tambem declara:
+
+- `projeto-miranda-redis`: broker/cache Redis;
+- `projeto-miranda-celery-worker`: processa envios push e retentativas;
+- `projeto-miranda-celery-beat`: agenda rotinas periodicas de retry, limpeza e marcacao de entregas antigas.
+
+O web service nao deve executar envio massivo diretamente quando `PUSH_DISPATCH_ASYNC=true`; ele cria os logs e enfileira a tarefa para o worker.
+
 ## Variaveis obrigatorias no Render
 
 ### Django e seguranca
@@ -49,6 +57,10 @@ SECURE_SSL_REDIRECT=true
 SESSION_COOKIE_SECURE=true
 CSRF_COOKIE_SECURE=true
 SECURE_HSTS_SECONDS=31536000
+SESSION_COOKIE_AGE=28800
+SESSION_EXPIRE_AT_BROWSER_CLOSE=true
+MANAGER_TOKEN_TTL_SECONDS=28800
+MANAGER_TOKEN_ROTATE_ON_LOGIN=true
 ```
 
 ### Banco Aiven/MySQL
@@ -91,6 +103,7 @@ CLOUDINARY_MEDIA_FOLDER=nexa
 
 ```text
 PUSH_DISPATCH_ON_PUBLISH=true
+PUSH_DISPATCH_ASYNC=true
 FIREBASE_ENABLED=true
 FIREBASE_PROJECT_ID
 FIREBASE_CLIENT_EMAIL
@@ -102,6 +115,16 @@ FIREBASE_PRIVATE_KEY
 ```text
 "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
+
+### Redis/Celery
+
+```text
+REDIS_URL
+CELERY_BROKER_URL=redis://...   # opcional se REDIS_URL estiver definido
+CELERY_RESULT_BACKEND=redis://... # opcional se REDIS_URL estiver definido
+```
+
+Todos os servicos `web`, `celery-worker` e `celery-beat` precisam compartilhar `SECRET_KEY`, credenciais do banco, Redis, Firebase e Cloudinary. No blueprint, `REDIS_URL` vem do servico Redis; os demais segredos marcados como `sync: false` devem ser preenchidos no Render.
 
 ### SMTP/e-mail
 
@@ -136,6 +159,9 @@ Se essas variaveis existirem, o build executa `python manage.py upsert_admin`.
 - Cloudinary esta com credenciais validas.
 - Firebase esta com service account valida.
 - `FIREBASE_ENABLED=true` somente quando as credenciais estiverem certas.
+- Redis esta criado e `REDIS_URL` aparece nos servicos web, worker e beat.
+- `PUSH_DISPATCH_ASYNC=true` somente quando worker e Redis estiverem ativos.
+- `SECRET_KEY` e credenciais de banco sao iguais entre web, worker e beat.
 - SMTP foi configurado se reset de senha por e-mail for necessario.
 - Backup automatico do Aiven foi conferido.
 
@@ -160,6 +186,27 @@ Checar configuracao Django:
 ```bash
 cd backend
 python manage.py check
+```
+
+Checar configuracao de producao:
+
+```bash
+cd backend
+python manage.py check --deploy
+```
+
+Rodar worker Celery localmente:
+
+```bash
+cd backend
+celery -A core worker --loglevel=info
+```
+
+Rodar scheduler Celery Beat localmente:
+
+```bash
+cd backend
+celery -A core beat --loglevel=info
 ```
 
 Validar variaveis locais sem imprimir segredos:
@@ -192,9 +239,10 @@ python scripts/test_db_connection.py
 12. Testar upload de PDF/imagem em comunicado.
 13. Confirmar URL do anexo no Cloudinary.
 14. Registrar um token em `/api/push-devices/`.
-15. Publicar comunicado e verificar `push_dispatch.configured=true`.
-16. Se houver token real, confirmar `sent > 0` e recebimento no app/PWA.
-17. Testar reset de senha se SMTP estiver configurado.
+15. Publicar comunicado e verificar `push_dispatch.queued=true` quando `PUSH_DISPATCH_ASYNC=true`.
+16. Conferir logs do `projeto-miranda-celery-worker` e confirmar envio ou falha registrada.
+17. Se houver token real, confirmar `sent > 0` e recebimento no app/PWA.
+18. Testar reset de senha se SMTP estiver configurado.
 
 ## Teste rapido de API
 
@@ -276,12 +324,28 @@ Resposta esperada quando Firebase esta configurado:
 }
 ```
 
+Resposta esperada quando o envio assincrono esta ativo:
+
+```json
+{
+  "push_dispatch": {
+    "configured": true,
+    "sent": 0,
+    "failed": 0,
+    "pending": 1,
+    "queued": true,
+    "skipped": false
+  }
+}
+```
+
 ## Operacao continua
 
 - Revisar logs do Render apos cada deploy.
 - Conferir backup Aiven semanalmente.
 - Testar restore mensalmente conforme `backend/docs/BACKUP_RESTORE.md`.
 - Revisar usuarios administradores periodicamente em `/api/managers/`.
+- Gestores recebem token rotacionado no login e expirado conforme `MANAGER_TOKEN_TTL_SECONDS`.
 - Revisar solicitacoes LGPD em `/api/privacy-requests/`.
 - Revisar auditoria em `/api/audit-logs/`.
 

@@ -1,8 +1,13 @@
+import logging
+
 from django.conf import settings
 from django.db.models import Q
 
 from .models import DeliveryLog, PushDevice
 from .services import PushNotificationService
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_delivery_devices(announcement):
@@ -59,6 +64,29 @@ def dispatch_published_announcement(announcement):
             'skipped': True,
         }
 
+    if getattr(settings, 'PUSH_DISPATCH_ASYNC', False):
+        service = PushNotificationService()
+        try:
+            from .tasks import process_announcement_deliveries
+
+            process_announcement_deliveries.delay(announcement.id)
+            return {
+                'configured': service.is_configured,
+                'sent': 0,
+                'failed': 0,
+                'pending': announcement.delivery_logs.filter(
+                    status=DeliveryLog.STATUS_PENDING,
+                ).count(),
+                'queued': True,
+                'skipped': False,
+            }
+        except Exception as error:
+            logger.exception(
+                'Failed to enqueue announcement delivery; falling back to sync dispatch.',
+                extra={'announcement_id': announcement.id, 'error': str(error)},
+            )
+
     result = PushNotificationService().dispatch_pending_for_announcement(announcement)
+    result['queued'] = False
     result['skipped'] = False
     return result

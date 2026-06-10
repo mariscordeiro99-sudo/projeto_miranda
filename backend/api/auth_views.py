@@ -10,12 +10,14 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from rest_framework import parsers, status, throttling
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import parsers, serializers, status, throttling
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .authentication import issue_auth_token, manager_token_ttl_seconds
 from .media_validation import validate_profile_picture
 from .models import Profile
 
@@ -27,6 +29,29 @@ class RegisterView(APIView):
     throttle_scope = 'auth_register'
     parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
 
+    @extend_schema(
+        request=inline_serializer(
+            name='RegisterRequest',
+            fields={
+                'username': serializers.CharField(),
+                'email': serializers.EmailField(),
+                'password': serializers.CharField(write_only=True),
+                'first_name': serializers.CharField(required=False, allow_blank=True),
+                'phone_number': serializers.CharField(required=False, allow_blank=True),
+                'telefone': serializers.CharField(required=False, allow_blank=True),
+                'is_gestor': serializers.BooleanField(required=False),
+                'isGestor': serializers.BooleanField(required=False),
+                'profile_picture': serializers.ImageField(required=False),
+            },
+        ),
+        responses=inline_serializer(
+            name='RegisterResponse',
+            fields={
+                'message': serializers.CharField(),
+                'user': serializers.DictField(),
+            },
+        ),
+    )
     def post(self, request, *args, **kwargs):
         username = request.data.get('username', '')
         email = request.data.get('email', '')
@@ -128,6 +153,25 @@ class LoginView(APIView):
     throttle_classes = [throttling.ScopedRateThrottle]
     throttle_scope = 'auth_login'
 
+    @extend_schema(
+        request=inline_serializer(
+            name='LoginRequest',
+            fields={
+                'username': serializers.CharField(),
+                'password': serializers.CharField(write_only=True),
+            },
+        ),
+        responses=inline_serializer(
+            name='LoginResponse',
+            fields={
+                'access_token': serializers.CharField(),
+                'token': serializers.CharField(),
+                'token_type': serializers.CharField(),
+                'expires_in': serializers.IntegerField(required=False, allow_null=True),
+                'user': serializers.DictField(),
+            },
+        ),
+    )
     def post(self, request, *args, **kwargs):
         login_value = request.data.get('username', '').strip()
         password = request.data.get('password', '')
@@ -156,12 +200,14 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        token, _ = Token.objects.get_or_create(user=user)
+        token = issue_auth_token(user)
+        token_expires_in = manager_token_ttl_seconds(user)
         return Response(
             {
                 'access_token': token.key,
                 'token': token.key,
                 'token_type': 'bearer',
+                'expires_in': token_expires_in,
                 'user': {
                     'username': user.username,
                     'email': user.email,
@@ -179,6 +225,19 @@ class PasswordResetRequestView(APIView):
     throttle_classes = [throttling.ScopedRateThrottle]
     throttle_scope = 'password_reset'
 
+    @extend_schema(
+        request=inline_serializer(
+            name='PasswordResetRequestPayload',
+            fields={
+                'email': serializers.EmailField(required=False),
+                'username': serializers.CharField(required=False),
+            },
+        ),
+        responses=inline_serializer(
+            name='PasswordResetRequestResponse',
+            fields={'detail': serializers.CharField()},
+        ),
+    )
     def post(self, request, *args, **kwargs):
         identifier = request.data.get('email', '') or request.data.get('username', '')
         identifier = identifier.strip()
@@ -220,6 +279,21 @@ class PasswordResetConfirmView(APIView):
     throttle_classes = [throttling.ScopedRateThrottle]
     throttle_scope = 'password_reset'
 
+    @extend_schema(
+        request=inline_serializer(
+            name='PasswordResetConfirmRequest',
+            fields={
+                'uid': serializers.CharField(),
+                'token': serializers.CharField(),
+                'new_password': serializers.CharField(write_only=True, required=False),
+                'password': serializers.CharField(write_only=True, required=False),
+            },
+        ),
+        responses=inline_serializer(
+            name='PasswordResetConfirmResponse',
+            fields={'detail': serializers.CharField()},
+        ),
+    )
     def post(self, request, *args, **kwargs):
         uid = request.data.get('uid', '')
         token = request.data.get('token', '')
@@ -253,6 +327,7 @@ class PasswordResetConfirmView(APIView):
 
         user.set_password(new_password)
         user.save(update_fields=['password'])
+        Token.objects.filter(user=user).delete()
 
         return Response(
             {'detail': 'Password has been reset successfully.'},
