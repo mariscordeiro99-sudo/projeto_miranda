@@ -7,7 +7,9 @@ from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -28,6 +30,7 @@ from .models import (
     Segment,
 )
 from .media_validation import validate_attachment
+from .reports import build_dashboard_report
 
 
 def mp4_atom(atom_type, payload):
@@ -224,6 +227,27 @@ class ManagerTokenPolicyTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(Token.objects.filter(key=token.key).exists())
+
+    def test_inactive_user_cannot_login_or_use_existing_token(self):
+        token = Token.objects.create(user=self.citizen_user)
+        self.citizen_user.is_active = False
+        self.citizen_user.save(update_fields=['is_active'])
+
+        login_response = self.client.post(
+            '/auth/login/',
+            {
+                'username': self.citizen_user.username,
+                'password': 'SenhaForte123',
+            },
+            format='json',
+        )
+
+        self.assertEqual(login_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+        api_response = self.client.get('/api/profiles/')
+
+        self.assertEqual(api_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_password_reset_revokes_existing_tokens(self):
         token = Token.objects.create(user=self.citizen_user)
@@ -1411,6 +1435,14 @@ class DashboardReportTests(APITestCase):
         self.assertEqual(response.data['recent_views'][0]['recipient'], 'cidadao_relatorio')
         self.assertEqual(response.data['recent_views'][0]['announcement'], self.published.title)
 
+    def test_dashboard_report_uses_bounded_query_count(self):
+        with CaptureQueriesContext(connection) as queries:
+            report = build_dashboard_report()
+
+        self.assertLessEqual(len(queries), 13)
+        self.assertEqual(report['users']['active'], 2)
+        self.assertEqual(report['delivery']['view_rate'], 25.0)
+
 
 @override_settings(
     STORAGES={
@@ -1460,18 +1492,156 @@ class AdminDashboardTests(APITestCase):
         response = self.client.get('/admin/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertContains(response, 'Relatorios gerais')
-        self.assertContains(response, 'usuarios ativos')
+        self.assertContains(response, 'Relatórios gerais')
+        self.assertContains(response, 'usuários ativos')
         self.assertContains(response, 'comunicados publicados')
         self.assertContains(response, 'dispositivos ativos')
         self.assertContains(response, 'falhas de envio')
-        self.assertContains(response, 'Ações recentes')
         self.assertContains(response, 'entregas enviadas')
-        self.assertContains(response, 'taxa de visualizacao')
+        self.assertContains(response, 'taxa de visualização')
+        self.assertContains(response, 'miranda-metric-card')
+        self.assertContains(response, 'admin/img/nexa-logo.png')
+        self.assertNotContains(response, 'Ações recentes')
+        self.assertNotContains(response, 'Minhas ações')
+
+    def test_admin_login_uses_custom_jazzmin_styles(self):
+        response = self.client.get('/admin/login/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'NEXA | Projeto Miranda')
+        self.assertContains(response, 'admin/img/nexa-logo.png')
+        self.assertContains(response, 'admin/img/nexa-icon.svg')
+        self.assertContains(response, 'admin/css/miranda_admin.css')
+
+    def test_admin_logout_uses_custom_jazzmin_logo(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get('/admin/logout/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'admin/img/nexa-logo.png')
+        self.assertContains(response, 'NEXA | Projeto Miranda')
+
+    def test_admin_user_change_form_exposes_active_field(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(f'/admin/auth/user/{self.citizen_user.id}/change/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'name="is_active"')
+        self.assertContains(response, 'Ativo')
+        self.assertContains(response, 'sem apagar o histórico do usuário')
+
+    def test_admin_user_active_field_deactivates_and_reactivates_access(self):
+        managed_user = User.objects.create_user(
+            username='usuario_campo_ativo',
+            email='usuario_campo_ativo@example.com',
+            password='SenhaForte123',
+        )
+        token = Token.objects.create(user=managed_user)
+        device = PushDevice.objects.create(
+            user=managed_user,
+            token='admin-active-field-device',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.client.force_login(self.admin_user)
+
+        deactivate_response = self.client.post(
+            f'/admin/auth/user/{managed_user.id}/change/',
+            self.user_admin_payload(managed_user, is_active=False),
+        )
+
+        self.assertEqual(deactivate_response.status_code, status.HTTP_302_FOUND)
+        managed_user.refresh_from_db()
+        device.refresh_from_db()
+        self.assertFalse(managed_user.is_active)
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
+        self.assertFalse(device.is_active)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='admin_user_deactivated',
+                target_id=str(managed_user.id),
+            ).exists()
+        )
+
+        self.client.logout()
+        login_response = self.client.post(
+            '/auth/login/',
+            {
+                'username': managed_user.username,
+                'password': 'SenhaForte123',
+            },
+            format='json',
+        )
+        self.assertEqual(login_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.force_login(self.admin_user)
+        reactivate_response = self.client.post(
+            f'/admin/auth/user/{managed_user.id}/change/',
+            self.user_admin_payload(managed_user, is_active=True),
+        )
+
+        self.assertEqual(reactivate_response.status_code, status.HTTP_302_FOUND)
+        managed_user.refresh_from_db()
+        self.assertTrue(managed_user.is_active)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='admin_user_reactivated',
+                target_id=str(managed_user.id),
+            ).exists()
+        )
+
+    def test_admin_action_reactivates_selected_users(self):
+        inactive_user = User.objects.create_user(
+            username='usuario_reativar_admin',
+            email='usuario_reativar_admin@example.com',
+            password='SenhaForte123',
+            is_active=False,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            '/admin/auth/user/',
+            {
+                'action': 'activate_selected_users',
+                '_selected_action': [str(inactive_user.id)],
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        inactive_user.refresh_from_db()
+        self.assertTrue(inactive_user.is_active)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='admin_user_reactivated',
+                target_id=str(inactive_user.id),
+            ).exists()
+        )
+
+    def user_admin_payload(self, user, is_active):
+        payload = {
+            'username': user.username,
+            'password': user.password,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+            'email': user.email,
+            '_save': 'Salvar',
+        }
+        if is_active:
+            payload['is_active'] = 'on'
+        if user.is_staff:
+            payload['is_staff'] = 'on'
+        if user.is_superuser:
+            payload['is_superuser'] = 'on'
+        return payload
 
     def test_admin_report_detail_pages_are_custom_and_staff_only(self):
         urls = [
-            ('/admin/reports/users-active/', 'Usuarios ativos'),
+            ('/admin/reports/users-active/', 'Usuários ativos'),
             ('/admin/reports/announcements-published/', 'Comunicados publicados'),
             ('/admin/reports/devices-active/', 'Dispositivos ativos'),
             ('/admin/reports/delivery-failures/', 'Falhas de envio'),
@@ -1487,7 +1657,7 @@ class AdminDashboardTests(APITestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertContains(response, title)
-            self.assertContains(response, 'Voltar para relatorios')
+            self.assertContains(response, 'Voltar para relatórios')
 
     def test_admin_create_and_update_are_audited(self):
         self.client.force_login(self.admin_user)

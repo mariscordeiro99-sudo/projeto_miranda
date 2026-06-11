@@ -14,18 +14,18 @@ def active_users_report(request):
             'url': reverse('admin:auth_user_change', args=[user.id]),
             'primary': user.get_full_name() or user.username,
             'secondary': user.email or 'Sem e-mail',
-            'meta': 'Staff' if user.is_staff else 'Cidadao',
+            'meta': 'Staff' if user.is_staff else 'Cidadão',
             'status': 'Ativo',
         }
         for user in users
     ]
     return render_report(
         request,
-        title='Usuarios ativos',
-        eyebrow='Relatorio de acesso',
+        title='Usuários ativos',
+        eyebrow='Relatório de acesso',
         count=users.count(),
         rows=rows,
-        empty_message='Nenhum usuario ativo encontrado.',
+        empty_message='Nenhum usuário ativo encontrado.',
     )
 
 
@@ -50,7 +50,7 @@ def published_announcements_report(request):
     return render_report(
         request,
         title='Comunicados publicados',
-        eyebrow='Conteudo oficial',
+        eyebrow='Conteúdo oficial',
         count=announcements.count(),
         rows=rows,
         empty_message='Nenhum comunicado publicado encontrado.',
@@ -68,7 +68,7 @@ def active_devices_report(request):
     rows = [
         {
             'url': reverse('admin:api_pushdevice_change', args=[device.id]),
-            'primary': device.user.get_username() if device.user else 'Sem usuario',
+            'primary': device.user.get_username() if device.user else 'Sem usuário',
             'secondary': f'{device.platform} #{device.id}',
             'meta': token_preview(device.token),
             'status': 'Ativo',
@@ -133,7 +133,7 @@ def render_report(request, title, eyebrow, count, rows, empty_message, danger=Fa
 
 def admin_context(request):
     return {
-        'site_header': 'Administracao do Projeto Miranda',
+        'site_header': 'Administração do Projeto Miranda',
         'site_title': 'Projeto Miranda',
         'has_permission': True,
         'is_popup': False,

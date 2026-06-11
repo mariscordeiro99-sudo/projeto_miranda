@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 
 from .audit import record_audit_log
-from .reports import build_dashboard_report
+from .reports import clear_dashboard_report_cache, get_cached_dashboard_report
 from .models import (
     Announcement,
     Attachment,
@@ -30,6 +30,7 @@ class AuditedAdminMixin:
             f'admin_{obj._meta.model_name}_{action}',
             obj,
         )
+        clear_dashboard_report_cache()
 
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
@@ -53,6 +54,8 @@ class AuditedAdminMixin:
                 obj,
                 {'parent': str(form.instance)},
             )
+        if instances or deleted_objects:
+            clear_dashboard_report_cache()
 
 
 class NoDeleteAdminMixin:
@@ -65,9 +68,9 @@ class NoDeleteInlineMixin:
         return False
 
 
-admin.site.site_header = 'Administracao do Projeto Miranda'
+admin.site.site_header = 'Administração do Projeto Miranda'
 admin.site.site_title = 'Projeto Miranda'
-admin.site.index_title = 'Painel de administracao'
+admin.site.index_title = 'Painel administrativo'
 admin.site.index_template = 'admin/dashboard_index.html'
 
 admin_site_index = admin.site.index
@@ -75,7 +78,9 @@ admin_site_index = admin.site.index
 
 def dashboard_index(request, extra_context=None):
     extra_context = extra_context or {}
-    extra_context['dashboard_report'] = build_dashboard_report()
+    extra_context['dashboard_report'] = get_cached_dashboard_report(
+        include_activity=False
+    )
     return admin_site_index(request, extra_context=extra_context)
 
 
@@ -90,11 +95,89 @@ except NotRegistered:
 
 @admin.register(User)
 class UserAdmin(AuditedAdminMixin, NoDeleteAdminMixin, DjangoUserAdmin):
-    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active')
+    fieldsets = (
+        (
+            'Acesso',
+            {
+                'fields': ('username', 'password', 'is_active'),
+                'description': (
+                    'Use o campo Ativo para bloquear ou liberar o acesso '
+                    'sem apagar o histórico do usuário.'
+                ),
+            },
+        ),
+        ('Dados pessoais', {'fields': ('first_name', 'last_name', 'email')}),
+        (
+            'Permissões',
+            {'fields': ('is_staff', 'is_superuser', 'groups', 'user_permissions')},
+        ),
+        ('Datas importantes', {'fields': ('last_login', 'date_joined')}),
+    )
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_active', 'is_staff')
+    list_editable = ('is_active',)
     list_filter = ('is_active', 'is_staff', 'is_superuser', 'groups')
-    actions = ('deactivate_selected_users',)
+    readonly_fields = ('last_login', 'date_joined')
+    search_fields = ('username', 'email', 'first_name', 'last_name')
+    actions = ('deactivate_selected_users', 'activate_selected_users')
 
-    @admin.action(description='Inativar usuarios selecionados e revogar acessos')
+    def save_model(self, request, obj, form, change):
+        was_active = None
+        if change and obj.pk:
+            was_active = User.objects.only('is_active').get(pk=obj.pk).is_active
+
+        if change and obj.pk == request.user.pk and was_active and not obj.is_active:
+            obj.is_active = True
+            self.message_user(
+                request,
+                'A própria conta logada não pode ser inativada por segurança.',
+                level=messages.WARNING,
+            )
+
+        super().save_model(request, obj, form, change)
+
+        if not change or was_active is None or was_active == obj.is_active:
+            return
+
+        clear_dashboard_report_cache()
+        if not obj.is_active:
+            tokens_deleted, _ = Token.objects.filter(user=obj).delete()
+            devices_updated = PushDevice.objects.filter(
+                user=obj,
+                is_active=True,
+            ).update(is_active=False)
+            record_audit_log(
+                request.user,
+                'admin_user_deactivated',
+                obj,
+                {
+                    'source': 'admin_form',
+                    'tokens_deleted_total': tokens_deleted,
+                    'push_devices_deactivated_total': devices_updated,
+                },
+            )
+            self.message_user(
+                request,
+                (
+                    'Usuário inativado. '
+                    f'{tokens_deleted} token(s) revogado(s) e '
+                    f'{devices_updated} dispositivo(s) push desativado(s).'
+                ),
+                level=messages.SUCCESS,
+            )
+        else:
+            record_audit_log(
+                request.user,
+                'admin_user_reactivated',
+                obj,
+                {'source': 'admin_form'},
+            )
+            self.message_user(
+                request,
+                'Usuário reativado com sucesso.',
+                level=messages.SUCCESS,
+            )
+
+    @admin.action(description='Inativar usuários selecionados e revogar acessos')
     def deactivate_selected_users(self, request, queryset):
         target_users = list(queryset.exclude(pk=request.user.pk))
         skipped_current_user = queryset.filter(pk=request.user.pk).exists()
@@ -102,7 +185,7 @@ class UserAdmin(AuditedAdminMixin, NoDeleteAdminMixin, DjangoUserAdmin):
         if not target_users:
             self.message_user(
                 request,
-                'Nenhum usuario foi inativado. A propria conta logada nao pode ser inativada por esta acao.',
+                'Nenhum usuário foi inativado. A própria conta logada não pode ser inativada por esta ação.',
                 level=messages.WARNING,
             )
             return
@@ -134,14 +217,36 @@ class UserAdmin(AuditedAdminMixin, NoDeleteAdminMixin, DjangoUserAdmin):
             )
 
         message = (
-            f'{users_updated} usuario(s) inativado(s), '
+            f'{users_updated} usuário(s) inativado(s), '
             f'{tokens_deleted} token(s) revogado(s) e '
             f'{devices_updated} dispositivo(s) push desativado(s).'
         )
         if skipped_current_user:
-            message += ' A propria conta logada foi ignorada por seguranca.'
+            message += ' A própria conta logada foi ignorada por segurança.'
 
+        clear_dashboard_report_cache()
         self.message_user(request, message, level=messages.SUCCESS)
+
+    @admin.action(description='Reativar usuários selecionados')
+    def activate_selected_users(self, request, queryset):
+        target_users = list(queryset.filter(is_active=False))
+        users_updated = queryset.filter(is_active=False).update(is_active=True)
+
+        for user in target_users:
+            user.is_active = True
+            record_audit_log(
+                request.user,
+                'admin_user_reactivated',
+                user,
+                {'source': 'admin_action'},
+            )
+
+        clear_dashboard_report_cache()
+        self.message_user(
+            request,
+            f'{users_updated} usuário(s) reativado(s).',
+            level=messages.SUCCESS,
+        )
 
 
 @admin.register(Document)

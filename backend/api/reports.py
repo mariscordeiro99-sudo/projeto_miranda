@@ -1,44 +1,95 @@
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.db.models import Count, Q
 
 from .models import Announcement, DeliveryLog, Profile, PushDevice
 
 
-def build_dashboard_report():
-    delivery_total = DeliveryLog.objects.count()
-    delivery_sent = DeliveryLog.objects.filter(
-        status__in=[DeliveryLog.STATUS_SENT, DeliveryLog.STATUS_VIEWED]
-    ).count()
-    delivery_failed = DeliveryLog.objects.filter(status=DeliveryLog.STATUS_FAILED).count()
-    delivery_viewed = DeliveryLog.objects.filter(status=DeliveryLog.STATUS_VIEWED).count()
+def get_cached_dashboard_report(include_activity=True):
+    cache_key = (
+        'dashboard-report:full:v2'
+        if include_activity
+        else 'dashboard-report:admin:v2'
+    )
+    cached_report = cache.get(cache_key)
+    if cached_report is not None:
+        return cached_report
 
-    return {
+    report = build_dashboard_report(include_activity=include_activity)
+    cache.set(
+        cache_key,
+        report,
+        getattr(settings, 'DASHBOARD_REPORT_CACHE_TIMEOUT', 30),
+    )
+    return report
+
+
+def clear_dashboard_report_cache():
+    cache.delete_many([
+        'dashboard-report:full:v2',
+        'dashboard-report:admin:v2',
+    ])
+
+
+def build_dashboard_report(include_activity=True):
+    delivery = build_delivery_metrics()
+    report = {
         'users': build_user_metrics(),
         'announcements': build_announcement_metrics(),
-        'delivery': {
-            'total_logs': delivery_total,
-            'pending': DeliveryLog.objects.filter(status=DeliveryLog.STATUS_PENDING).count(),
-            'sent': delivery_sent,
-            'failed': delivery_failed,
-            'viewed': delivery_viewed,
-            'view_rate': percentage(delivery_viewed, delivery_total),
-            'failure_rate': percentage(delivery_failed, delivery_total),
-        },
+        'delivery': delivery,
         'devices': build_device_metrics(),
         'recent_announcements': build_recent_announcement_metrics(),
-        'active_devices': build_active_device_details(),
         'recent_failures': build_recent_failure_details(),
-        'recent_views': build_recent_view_details(),
+    }
+
+    if include_activity:
+        report['active_devices'] = build_active_device_details()
+        report['recent_views'] = build_recent_view_details()
+    else:
+        report['active_devices'] = []
+        report['recent_views'] = []
+
+    return report
+
+
+def build_delivery_metrics():
+    metrics = DeliveryLog.objects.aggregate(
+        total_logs=Count('id'),
+        pending=Count('id', filter=Q(status=DeliveryLog.STATUS_PENDING)),
+        sent=Count(
+            'id',
+            filter=Q(status__in=[
+                DeliveryLog.STATUS_SENT,
+                DeliveryLog.STATUS_VIEWED,
+            ]),
+        ),
+        failed=Count('id', filter=Q(status=DeliveryLog.STATUS_FAILED)),
+        viewed=Count('id', filter=Q(status=DeliveryLog.STATUS_VIEWED)),
+    )
+    total_logs = metrics['total_logs']
+
+    return {
+        **metrics,
+        'view_rate': percentage(metrics['viewed'], total_logs),
+        'failure_rate': percentage(metrics['failed'], total_logs),
     }
 
 
 def build_user_metrics():
+    user_metrics = User.objects.aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(is_active=True)),
+        staff=Count('id', filter=Q(is_staff=True)),
+    )
+    profile_metrics = Profile.objects.aggregate(
+        citizens=Count('id', filter=Q(role=Profile.ROLE_CITIZEN)),
+        managers=Count('id', filter=Q(role=Profile.ROLE_MANAGER)),
+    )
+
     return {
-        'total': User.objects.count(),
-        'active': User.objects.filter(is_active=True).count(),
-        'staff': User.objects.filter(is_staff=True).count(),
-        'citizens': Profile.objects.filter(role=Profile.ROLE_CITIZEN).count(),
-        'managers': Profile.objects.filter(role=Profile.ROLE_MANAGER).count(),
+        **user_metrics,
+        **profile_metrics,
         'with_active_push_device': (
             PushDevice.objects
             .filter(is_active=True, user_id__isnull=False)
@@ -50,15 +101,13 @@ def build_user_metrics():
 
 
 def build_announcement_metrics():
-    return {
-        'total': Announcement.objects.count(),
-        'published': Announcement.objects.filter(
-            status=Announcement.STATUS_PUBLISHED
-        ).count(),
-        'draft': Announcement.objects.filter(status=Announcement.STATUS_DRAFT).count(),
-        'archived': Announcement.objects.filter(status=Announcement.STATUS_ARCHIVED).count(),
-        'pinned': Announcement.objects.filter(pinned=True).count(),
-    }
+    return Announcement.objects.aggregate(
+        total=Count('id'),
+        published=Count('id', filter=Q(status=Announcement.STATUS_PUBLISHED)),
+        draft=Count('id', filter=Q(status=Announcement.STATUS_DRAFT)),
+        archived=Count('id', filter=Q(status=Announcement.STATUS_ARCHIVED)),
+        pinned=Count('id', filter=Q(pinned=True)),
+    )
 
 
 def build_device_metrics():
@@ -70,37 +119,45 @@ def build_device_metrics():
         row['platform']: row['total']
         for row in PushDevice.objects.values('platform').annotate(total=Count('id'))
     })
-    active_platform_counts = {
-        platform: 0
-        for platform, _ in PushDevice.PLATFORM_CHOICES
-    }
-    active_platform_counts.update({
-        row['platform']: row['total']
-        for row in (
-            PushDevice.objects
-            .filter(is_active=True)
-            .values('platform')
-            .annotate(total=Count('id'))
-        )
-    })
+    device_metrics = PushDevice.objects.aggregate(
+        total=Count('id'),
+        active=Count('id', filter=Q(is_active=True)),
+        inactive=Count('id', filter=Q(is_active=False)),
+        anonymous=Count('id', filter=Q(user_id__isnull=True)),
+        active_mobile=Count(
+            'id',
+            filter=Q(
+                is_active=True,
+                platform__in=[
+                    PushDevice.PLATFORM_ANDROID,
+                    PushDevice.PLATFORM_IOS,
+                ],
+            ),
+        ),
+        active_web=Count(
+            'id',
+            filter=Q(is_active=True, platform=PushDevice.PLATFORM_WEB),
+        ),
+    )
 
     return {
-        'total': PushDevice.objects.count(),
-        'active': PushDevice.objects.filter(is_active=True).count(),
-        'inactive': PushDevice.objects.filter(is_active=False).count(),
-        'anonymous': PushDevice.objects.filter(user_id__isnull=True).count(),
+        **device_metrics,
         'by_platform': platform_counts,
-        'active_mobile': (
-            active_platform_counts[PushDevice.PLATFORM_ANDROID]
-            + active_platform_counts[PushDevice.PLATFORM_IOS]
-        ),
-        'active_web': active_platform_counts[PushDevice.PLATFORM_WEB],
     }
 
 
 def build_recent_announcement_metrics():
+    recent_ids = list(
+        Announcement.objects
+        .order_by('-created_at')
+        .values_list('id', flat=True)[:5]
+    )
+    if not recent_ids:
+        return []
+
     announcements = (
         Announcement.objects
+        .filter(id__in=recent_ids)
         .annotate(
             delivery_total=Count('delivery_logs'),
             viewed_total=Count(
@@ -121,7 +178,7 @@ def build_recent_announcement_metrics():
                 filter=Q(delivery_logs__status=DeliveryLog.STATUS_FAILED),
             ),
         )
-        .order_by('-created_at')[:5]
+        .order_by('-created_at')
     )
 
     return [
@@ -220,7 +277,7 @@ def device_label(device):
 
 def user_label(user):
     if not user:
-        return 'Sem usuario'
+        return 'Sem usuário'
     return user.get_full_name() or user.username
 
 

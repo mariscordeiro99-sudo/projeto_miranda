@@ -124,6 +124,7 @@ if not DEBUG:
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -136,8 +137,128 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'corsheaders',
     'cloudinary',
-    'api',
+    'api.apps.ApiConfig',
 ]
+
+JAZZMIN_SETTINGS = {
+    'site_title': 'Administração | Projeto Miranda',
+    'site_header': 'NEXA | Projeto Miranda',
+    'site_brand': 'Nexa',
+    'site_logo': 'admin/img/nexa-logo.png',
+    'site_icon': 'admin/img/nexa-icon.svg',
+    'site_logo_classes': 'miranda-site-logo',
+    'login_logo': 'admin/img/nexa-logo.png',
+    'login_logo_dark': 'admin/img/nexa-logo.png',
+    'welcome_sign': 'Bem-vindo ao painel administrativo',
+    'copyright': 'Projeto Miranda',
+    'search_model': ['auth.User', 'api.Announcement', 'api.PushDevice'],
+    'topmenu_links': [
+        {'name': 'Início', 'url': 'admin:index'},
+        {'model': 'auth.User'},
+        {'model': 'api.Announcement'},
+    ],
+    'usermenu_links': [
+        {'model': 'auth.User'},
+    ],
+    'show_sidebar': True,
+    'navigation_expanded': True,
+    'hide_apps': [],
+    'hide_models': [],
+    'order_with_respect_to': [
+        'api',
+        'api.Announcement',
+        'api.Segment',
+        'api.DeliveryLog',
+        'api.PushDevice',
+        'api.Institution',
+        'api.VisualIdentity',
+        'api.Attachment',
+        'api.Document',
+        'api.Profile',
+        'api.PrivacyRequest',
+        'api.AuditLog',
+        'auth',
+        'auth.User',
+        'auth.Group',
+    ],
+    'custom_links': {
+        'api': [
+            {
+                'name': 'Usuários ativos',
+                'url': 'admin-report-users-active',
+                'icon': 'fas fa-user-check',
+                'permissions': ['auth.view_user'],
+            },
+            {
+                'name': 'Comunicados publicados',
+                'url': 'admin-report-announcements-published',
+                'icon': 'fas fa-bullhorn',
+                'permissions': ['api.view_announcement'],
+            },
+            {
+                'name': 'Dispositivos ativos',
+                'url': 'admin-report-devices-active',
+                'icon': 'fas fa-mobile-alt',
+                'permissions': ['api.view_pushdevice'],
+            },
+            {
+                'name': 'Falhas de envio',
+                'url': 'admin-report-delivery-failures',
+                'icon': 'fas fa-exclamation-triangle',
+                'permissions': ['api.view_deliverylog'],
+            },
+        ],
+    },
+    'icons': {
+        'auth': 'fas fa-users-cog',
+        'auth.User': 'fas fa-user-shield',
+        'auth.Group': 'fas fa-users',
+        'api': 'fas fa-layer-group',
+        'api.Announcement': 'fas fa-bullhorn',
+        'api.Attachment': 'fas fa-paperclip',
+        'api.AuditLog': 'fas fa-clipboard-list',
+        'api.DeliveryLog': 'fas fa-paper-plane',
+        'api.Document': 'fas fa-file-alt',
+        'api.Institution': 'fas fa-landmark',
+        'api.PrivacyRequest': 'fas fa-user-lock',
+        'api.Profile': 'fas fa-id-card',
+        'api.PushDevice': 'fas fa-mobile-alt',
+        'api.Segment': 'fas fa-object-group',
+        'api.VisualIdentity': 'fas fa-palette',
+    },
+    'default_icon_parents': 'fas fa-chevron-circle-right',
+    'default_icon_children': 'fas fa-circle',
+    'related_modal_active': False,
+    'custom_css': 'admin/css/miranda_admin.css',
+    'custom_js': None,
+    'use_google_fonts_cdn': False,
+    'show_ui_builder': False,
+    'changeform_format': 'horizontal_tabs',
+    'language_chooser': False,
+}
+
+JAZZMIN_UI_TWEAKS = {
+    'theme': 'flatly',
+    'default_theme_mode': 'light',
+    'navbar': 'navbar-white navbar-light',
+    'no_navbar_border': True,
+    'sidebar': 'sidebar-light-primary',
+    'brand_colour': 'navbar-white',
+    'accent': 'accent-primary',
+    'navbar_fixed': True,
+    'sidebar_fixed': True,
+    'sidebar_nav_child_indent': True,
+    'sidebar_nav_compact_style': True,
+    'footer_fixed': False,
+    'button_classes': {
+        'primary': 'btn-primary',
+        'secondary': 'btn-outline-secondary',
+        'info': 'btn-info',
+        'warning': 'btn-warning',
+        'danger': 'btn-danger',
+        'success': 'btn-success',
+    },
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
@@ -356,6 +477,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REDIS_URL = os.getenv('REDIS_URL', '')
 CACHE_TIMEOUT = int(os.getenv('CACHE_TIMEOUT', '300'))
+DASHBOARD_REPORT_CACHE_TIMEOUT = int(os.getenv('DASHBOARD_REPORT_CACHE_TIMEOUT', '30'))
 
 if REDIS_URL:
     CACHES = {

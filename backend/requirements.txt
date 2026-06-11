@@ -3,6 +3,7 @@ gunicorn==21.2.0
 
 # Base do Django
 django>=4.2,<5.0
+django-jazzmin==3.0.4
 dj-database-url==2.1.0
 
 # Banco de Dados
