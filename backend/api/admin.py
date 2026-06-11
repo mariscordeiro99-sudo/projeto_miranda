@@ -1,7 +1,8 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.sites import NotRegistered
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import User
+from rest_framework.authtoken.models import Token
 
 from .audit import record_audit_log
 from .reports import build_dashboard_report
@@ -89,7 +90,58 @@ except NotRegistered:
 
 @admin.register(User)
 class UserAdmin(AuditedAdminMixin, NoDeleteAdminMixin, DjangoUserAdmin):
-    pass
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active')
+    list_filter = ('is_active', 'is_staff', 'is_superuser', 'groups')
+    actions = ('deactivate_selected_users',)
+
+    @admin.action(description='Inativar usuarios selecionados e revogar acessos')
+    def deactivate_selected_users(self, request, queryset):
+        target_users = list(queryset.exclude(pk=request.user.pk))
+        skipped_current_user = queryset.filter(pk=request.user.pk).exists()
+
+        if not target_users:
+            self.message_user(
+                request,
+                'Nenhum usuario foi inativado. A propria conta logada nao pode ser inativada por esta acao.',
+                level=messages.WARNING,
+            )
+            return
+
+        target_ids = [user.pk for user in target_users]
+        users_updated = User.objects.filter(pk__in=target_ids).update(
+            is_active=False,
+            is_staff=False,
+            is_superuser=False,
+        )
+        tokens_deleted, _ = Token.objects.filter(user_id__in=target_ids).delete()
+        devices_updated = PushDevice.objects.filter(
+            user_id__in=target_ids,
+            is_active=True,
+        ).update(is_active=False)
+
+        for user in target_users:
+            user.is_active = False
+            user.is_staff = False
+            user.is_superuser = False
+            record_audit_log(
+                request.user,
+                'admin_user_deactivated',
+                user,
+                {
+                    'tokens_deleted_total': tokens_deleted,
+                    'push_devices_deactivated_total': devices_updated,
+                },
+            )
+
+        message = (
+            f'{users_updated} usuario(s) inativado(s), '
+            f'{tokens_deleted} token(s) revogado(s) e '
+            f'{devices_updated} dispositivo(s) push desativado(s).'
+        )
+        if skipped_current_user:
+            message += ' A propria conta logada foi ignorada por seguranca.'
+
+        self.message_user(request, message, level=messages.SUCCESS)
 
 
 @admin.register(Document)

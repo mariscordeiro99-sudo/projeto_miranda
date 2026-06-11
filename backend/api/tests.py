@@ -1536,3 +1536,46 @@ class AdminDashboardTests(APITestCase):
                 target_id=str(institution.id),
             ).exists()
         )
+
+    def test_admin_action_deactivates_test_user_without_deleting_history(self):
+        test_user = User.objects.create_user(
+            username='usuario_teste_admin',
+            email='usuario_teste_admin@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        token = Token.objects.create(user=test_user)
+        device = PushDevice.objects.create(
+            user=test_user,
+            token='admin-test-user-device',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            '/admin/auth/user/',
+            {
+                'action': 'deactivate_selected_users',
+                '_selected_action': [str(test_user.id), str(self.admin_user.id)],
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
+        test_user.refresh_from_db()
+        self.admin_user.refresh_from_db()
+        device.refresh_from_db()
+        self.assertFalse(test_user.is_active)
+        self.assertFalse(test_user.is_staff)
+        self.assertFalse(test_user.is_superuser)
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
+        self.assertFalse(device.is_active)
+        self.assertTrue(self.admin_user.is_active)
+        self.assertTrue(self.admin_user.is_superuser)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='admin_user_deactivated',
+                target_id=str(test_user.id),
+            ).exists()
+        )
