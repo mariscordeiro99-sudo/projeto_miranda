@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppRoutes } from '../../routes/types/loginReg';
 
-// Criamos uma interface interna para o estado do usuário, evitando o tipo 'any' implícito
 interface NavBarUserData {
+  id: string;
   nome: string;
   foto: string | null;
   brasao: string | null;
@@ -19,6 +19,7 @@ export const useNavBar = () => {
       try {
         const parsed = JSON.parse(storedUser);
         return {
+          id: parsed.id || 'u1',
           nome: parsed.nome || 'Usuário',
           foto: parsed.fotoPerfil || parsed.foto || null,
           brasao: parsed.brasaoUrl || parsed.brasao || null,
@@ -36,8 +37,6 @@ export const useNavBar = () => {
   const [isProfileCardOpen, setIsProfileCardOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    // Se não houver dados do usuário no estado local, significa que a sessão caiu.
-    // Limpamos os resíduos do storage e mandamos para o Login de forma limpa.
     if (!userData) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user_data');

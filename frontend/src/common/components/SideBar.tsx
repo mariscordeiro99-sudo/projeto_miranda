@@ -14,6 +14,13 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, userRole, permissi
     return userRole === 'gestor' || permissions[perm] === true;
   };
 
+  const possuiAcessoAdministrativo =
+    userRole === 'gestor' ||
+    permissions.painelGestor ||
+    permissions.controleAcessos ||
+    permissions.editorComunicados ||
+    permissions.configIdentidade;
+
   return (
     <>
       <div
@@ -34,7 +41,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, userRole, permissi
 
         <nav className="menu-nav-list">
 
-          {userRole === 'gestor' && (
+          {possuiAcessoAdministrativo && (
             <div className="menu-section">
               <span className="section-label">Administração</span>
 
