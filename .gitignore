@@ -15,6 +15,7 @@ __pycache__/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+backend/staticfiles/
 
 # IDEs e Sistema Operacional
 .vscode/
