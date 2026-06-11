@@ -18,7 +18,7 @@ export const useControleAcesso = () => {
                         email: "carlos.eduardo@nexa.com",
                         foto: null,
                         roleAtual: "colaborador",
-                        permissoesPadrao: { controlAcess: false, announcement: true, idtVisual: false, isAdmin: false }
+                        permissoesPadrao: { controlAcess: false, announcement: true, idtVisual: false, dashboardGestor: false, isAdmin: false }
                     },
                     {
                         id: "u2",
@@ -26,7 +26,7 @@ export const useControleAcesso = () => {
                         email: "mariana.costa@nexa.com",
                         foto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150",
                         roleAtual: "gestor",
-                        permissoesPadrao: { controlAcess: true, announcement: true, idtVisual: true, isAdmin: true }
+                        permissoesPadrao: { controlAcess: true, announcement: true, idtVisual: true, dashboardGestor: true, isAdmin: true }
                     },
                     {
                         id: "u3",
@@ -34,7 +34,7 @@ export const useControleAcesso = () => {
                         email: "roberto.alves@nexa.com",
                         foto: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=150",
                         roleAtual: "colaborador",
-                        permissoesPadrao: { controlAcess: false, announcement: false, idtVisual: false, isAdmin: false }
+                        permissoesPadrao: { controlAcess: false, announcement: false, idtVisual: false, dashboardGestor: false, isAdmin: false }
                     }
                 ];
 
@@ -74,6 +74,7 @@ export const useControleAcesso = () => {
                 novasPermissoes.controlAcess = novoValorAdmin;
                 novasPermissoes.announcement = novoValorAdmin;
                 novasPermissoes.idtVisual = novoValorAdmin;
+                novasPermissoes.dashboardGestor = novoValorAdmin;
             } else {
                 novasPermissoes[chavePermissao] = !novasPermissoes[chavePermissao];
                 if (!novasPermissoes[chavePermissao]) {

@@ -42,6 +42,7 @@ export const AccessControlPage: React.FC = () => {
                                     <th className="text-center">Controle de Acesso</th>
                                     <th className="text-center">Edição de Anúncios</th>
                                     <th className="text-center">Identificação Visual</th>
+                                    <th className="text-center">Painel do Gestor</th> {/* 🆕 Cabeçalho adicionado */}
                                     <th className="text-center">Administrador (Total)</th>
                                     <th className="text-right">Ação</th>
                                 </tr>
@@ -96,6 +97,19 @@ export const AccessControlPage: React.FC = () => {
                                                     checked={usuario.permissoes.idtVisual}
                                                     disabled={usuario.permissoes.isAdmin}
                                                     onChange={() => alternarPermissao(usuario.id, 'idtVisual')}
+                                                />
+                                                <span className="checkmark"></span>
+                                            </label>
+                                        </td>
+
+                                        {/* 🆕 Coluna com a caixa de seleção do Painel do Gestor */}
+                                        <td className="text-center">
+                                            <label className="checkbox-custom-container">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={usuario.permissoes.dashboardGestor}
+                                                    disabled={usuario.permissoes.isAdmin}
+                                                    onChange={() => alternarPermissao(usuario.id, 'dashboardGestor')}
                                                 />
                                                 <span className="checkmark"></span>
                                             </label>

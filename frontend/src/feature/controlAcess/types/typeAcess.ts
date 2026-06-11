@@ -2,6 +2,7 @@ export interface PermissoesUsuario {
   controlAcess: boolean;
   announcement: boolean;
   idtVisual: boolean;
+  dashboardGestor: boolean;
   isAdmin: boolean;
 }
 
