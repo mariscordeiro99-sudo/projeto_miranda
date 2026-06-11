@@ -1,4 +1,10 @@
 services:
+  - type: redis
+    name: projeto-miranda-redis
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru
+
   - type: web
     name: projeto-miranda-backend
     runtime: python
@@ -17,6 +23,8 @@ services:
         value: America/Sao_Paulo
       - key: LANGUAGE_CODE
         value: pt-br
+      - key: ALLOWED_HOSTS
+        sync: false
       - key: SECRET_KEY
         generateValue: true
       - key: DB_NAME
@@ -37,6 +45,29 @@ services:
         value: "false"
       - key: PUSH_DISPATCH_ON_PUBLISH
         value: "true"
+      - key: PUSH_DISPATCH_ASYNC
+        value: "true"
+      - key: MANAGER_TOKEN_TTL_SECONDS
+        value: "28800"
+      - key: MANAGER_TOKEN_ROTATE_ON_LOGIN
+        value: "true"
+      - key: API_PAGE_SIZE
+        value: "20"
+      - key: THROTTLE_ANON_RATE
+        value: "100/hour"
+      - key: THROTTLE_USER_RATE
+        value: "1000/hour"
+      - key: CACHE_TIMEOUT
+        value: "300"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: projeto-miranda-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
       - key: FIREBASE_ENABLED
         value: "false"
       - key: FIREBASE_PROJECT_ID
@@ -45,3 +76,125 @@ services:
         sync: false
       - key: FIREBASE_PRIVATE_KEY
         sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+  - type: worker
+    name: projeto-miranda-celery-worker
+    runtime: python
+    plan: free
+    rootDir: .
+    buildCommand: cd backend && pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: cd backend && celery -A core worker --loglevel=info --concurrency=2
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.2
+      - key: DEBUG
+        value: "false"
+      - key: TIME_ZONE
+        value: America/Sao_Paulo
+      - key: LANGUAGE_CODE
+        value: pt-br
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_CA_CERT
+        sync: false
+      - key: DB_SSL_REQUIRED
+        value: "true"
+      - key: CORS_ALLOW_ALL_ORIGINS
+        value: "false"
+      - key: PUSH_DISPATCH_ON_PUBLISH
+        value: "true"
+      - key: PUSH_DISPATCH_ASYNC
+        value: "true"
+      - key: MANAGER_TOKEN_TTL_SECONDS
+        value: "28800"
+      - key: MANAGER_TOKEN_ROTATE_ON_LOGIN
+        value: "true"
+      - key: CACHE_TIMEOUT
+        value: "300"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: projeto-miranda-redis
+          property: connectionString
+      - key: FIREBASE_ENABLED
+        value: "false"
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+  - type: worker
+    name: projeto-miranda-celery-beat
+    runtime: python
+    plan: free
+    rootDir: .
+    buildCommand: cd backend && pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: cd backend && celery -A core beat --loglevel=info
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.2
+      - key: DEBUG
+        value: "false"
+      - key: TIME_ZONE
+        value: America/Sao_Paulo
+      - key: LANGUAGE_CODE
+        value: pt-br
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_CA_CERT
+        sync: false
+      - key: DB_SSL_REQUIRED
+        value: "true"
+      - key: CORS_ALLOW_ALL_ORIGINS
+        value: "false"
+      - key: PUSH_DISPATCH_ASYNC
+        value: "true"
+      - key: MANAGER_TOKEN_TTL_SECONDS
+        value: "28800"
+      - key: CACHE_TIMEOUT
+        value: "300"
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: projeto-miranda-redis
+          property: connectionString

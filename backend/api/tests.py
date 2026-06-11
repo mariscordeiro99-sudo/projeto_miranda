@@ -1,12 +1,16 @@
 import struct
 import tempfile
+from datetime import timedelta
 from shutil import rmtree
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.contrib.auth.tokens import default_token_generator
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -17,6 +21,7 @@ from .models import (
     Attachment,
     AuditLog,
     DeliveryLog,
+    Institution,
     PrivacyRequest,
     Profile,
     PushDevice,
@@ -149,6 +154,94 @@ class RegisterViewTests(APITestCase):
 
         profile = User.objects.get(username='cidadao_foto').profile
         self.assertTrue(profile.profile_picture.name)
+
+
+class ManagerTokenPolicyTests(APITestCase):
+    def setUp(self):
+        self.manager_user = User.objects.create_user(
+            username='gestor_token',
+            email='gestor_token@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=self.manager_user,
+            phone_number='51911111111',
+            role=Profile.ROLE_MANAGER,
+        )
+        self.citizen_user = User.objects.create_user(
+            username='cidadao_token',
+            email='cidadao_token@example.com',
+            password='SenhaForte123',
+        )
+        Profile.objects.create(
+            user=self.citizen_user,
+            phone_number='51922222222',
+            role=Profile.ROLE_CITIZEN,
+        )
+
+    @override_settings(MANAGER_TOKEN_ROTATE_ON_LOGIN=True, MANAGER_TOKEN_TTL_SECONDS=3600)
+    def test_manager_login_rotates_existing_token_and_returns_expiration(self):
+        old_token = Token.objects.create(user=self.manager_user)
+
+        response = self.client.post(
+            '/auth/login/',
+            {
+                'username': self.manager_user.username,
+                'password': 'SenhaForte123',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['expires_in'], 3600)
+        self.assertNotEqual(response.data['token'], old_token.key)
+        self.assertFalse(Token.objects.filter(key=old_token.key).exists())
+        self.assertTrue(Token.objects.filter(key=response.data['token']).exists())
+
+    @override_settings(MANAGER_TOKEN_TTL_SECONDS=60)
+    def test_expired_manager_token_is_rejected_and_revoked(self):
+        token = Token.objects.create(user=self.manager_user)
+        Token.objects.filter(key=token.key).update(
+            created=timezone.now() - timedelta(seconds=61)
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+        response = self.client.get('/api/reports/dashboard/')
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
+
+    @override_settings(MANAGER_TOKEN_TTL_SECONDS=60)
+    def test_citizen_token_is_not_expired_by_manager_policy(self):
+        token = Token.objects.create(user=self.citizen_user)
+        Token.objects.filter(key=token.key).update(
+            created=timezone.now() - timedelta(days=30)
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+        response = self.client.get('/api/profiles/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(Token.objects.filter(key=token.key).exists())
+
+    def test_password_reset_revokes_existing_tokens(self):
+        token = Token.objects.create(user=self.citizen_user)
+        uid = urlsafe_base64_encode(force_bytes(self.citizen_user.pk))
+        reset_token = default_token_generator.make_token(self.citizen_user)
+
+        response = self.client.post(
+            '/auth/password-reset-confirm/',
+            {
+                'uid': uid,
+                'token': reset_token,
+                'new_password': 'NovaSenhaForte123',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
 
 
 class ManagerManagementTests(APITestCase):
@@ -346,7 +439,7 @@ class PrivacyAndAuditTests(APITestCase):
         self.authenticate_as(self.admin_user)
         admin_response = self.client.get('/api/audit-logs/')
         self.assertEqual(admin_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(admin_response.data[0]['action'], 'test_action')
+        self.assertEqual(admin_response.data['results'][0]['action'], 'test_action')
 
     def test_citizen_can_create_and_list_own_privacy_request(self):
         self.authenticate_as(self.citizen_user)
@@ -375,7 +468,7 @@ class PrivacyAndAuditTests(APITestCase):
 
         list_response = self.client.get('/api/privacy-requests/')
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(list_response.data), 1)
+        self.assertEqual(len(list_response.data['results']), 1)
 
     def test_admin_can_complete_privacy_request(self):
         privacy_request = PrivacyRequest.objects.create(
@@ -657,7 +750,7 @@ class PublicDataExposureTests(APITestCase):
             response = self.client.get('/api/attachments/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        returned_ids = {item['id'] for item in response.data}
+        returned_ids = {item['id'] for item in response.data['results']}
         self.assertIn(published_attachment.id, returned_ids)
         self.assertNotIn(draft_attachment.id, returned_ids)
 
@@ -671,7 +764,7 @@ class PublicDataExposureTests(APITestCase):
             response = self.client.get('/api/attachments/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        returned_ids = {item['id'] for item in response.data}
+        returned_ids = {item['id'] for item in response.data['results']}
         self.assertIn(draft_attachment.id, returned_ids)
 
     def test_public_announcement_does_not_expose_author_email_or_staff_flag(self):
@@ -681,6 +774,138 @@ class PublicDataExposureTests(APITestCase):
         self.assertIn('author', response.data)
         self.assertNotIn('email', response.data['author'])
         self.assertNotIn('is_staff', response.data['author'])
+
+    def test_announcement_list_supports_pagination_search_filter_and_ordering(self):
+        Announcement.objects.create(
+            author=self.staff_user,
+            title='Publicado sobre saude',
+            content='Conteudo pesquisavel',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+
+        response = self.client.get(
+            '/api/announcements/?status=published&search=Publicado&page_size=1&ordering=title'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('count', response.data)
+        self.assertIn('results', response.data)
+        self.assertEqual(response.data['count'], 2)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['title'], 'Publicado')
+
+    def test_staff_can_filter_draft_announcements(self):
+        token = Token.objects.create(user=self.staff_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+        response = self.client.get('/api/announcements/?status=draft')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned_ids = {item['id'] for item in response.data['results']}
+        self.assertIn(self.draft.id, returned_ids)
+        self.assertNotIn(self.published.id, returned_ids)
+
+
+class DestructiveDeleteProtectionTests(APITestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username='gestor_delete',
+            email='gestor_delete@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        self.citizen_user = User.objects.create_user(
+            username='cidadao_delete',
+            email='cidadao_delete@example.com',
+            password='SenhaForte123',
+        )
+        self.device = PushDevice.objects.create(
+            user=self.citizen_user,
+            token='delete-protection-token',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        self.announcement = Announcement.objects.create(
+            author=self.staff_user,
+            title='Comunicado protegido',
+            content='Historico oficial protegido',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+        self.attachment = Attachment.objects.create(
+            announcement=self.announcement,
+            file='announcements/protegido.pdf',
+            original_name='protegido.pdf',
+            file_type=Attachment.TYPE_DOCUMENT,
+        )
+        self.delivery_log = DeliveryLog.objects.create(
+            announcement=self.announcement,
+            device=self.device,
+            recipient_user=self.citizen_user,
+            status=DeliveryLog.STATUS_SENT,
+        )
+
+    def authenticate_as_staff(self):
+        token = Token.objects.create(user=self.staff_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    def test_delete_is_blocked_for_official_records_and_logs(self):
+        self.authenticate_as_staff()
+
+        endpoints = [
+            f'/api/announcements/{self.announcement.id}/',
+            f'/api/attachments/{self.attachment.id}/',
+            f'/api/delivery-logs/{self.delivery_log.id}/',
+        ]
+
+        for endpoint in endpoints:
+            response = self.client.delete(endpoint)
+            self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+        self.assertTrue(Announcement.objects.filter(id=self.announcement.id).exists())
+        self.assertTrue(Attachment.objects.filter(id=self.attachment.id).exists())
+        self.assertTrue(DeliveryLog.objects.filter(id=self.delivery_log.id).exists())
+
+
+class HealthCheckTests(APITestCase):
+    def test_simple_health_check_is_public(self):
+        response = self.client.get('/health/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'healthy')
+        self.assertIn('timestamp', response.data)
+
+    def test_detailed_health_check_requires_admin(self):
+        response = self.client.get('/health/detailed/')
+
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
+        )
+
+    def test_detailed_health_check_returns_components_for_admin(self):
+        admin_user = User.objects.create_user(
+            username='admin_health',
+            email='admin_health@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        token = Token.objects.create(user=admin_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+        response = self.client.get('/health/detailed/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(response.data['status'], ['healthy', 'degraded'])
+        self.assertIn('database', response.data['components'])
+        self.assertIn('cache', response.data['components'])
+
+
+class ApiVersioningTests(APITestCase):
+    def test_v1_api_prefix_keeps_existing_routes_available(self):
+        response = self.client.get('/api/v1/hello/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'healthy')
 
 
 class DeliveryViewTrackingTests(APITestCase):
@@ -853,6 +1078,29 @@ class AutomaticPushDispatchTests(APITestCase):
         service_class.assert_not_called()
         self.assertEqual(response.data['push_dispatch']['skipped'], True)
         self.assertEqual(response.data['push_dispatch']['pending'], 1)
+        self.assertEqual(
+            DeliveryLog.objects.get(
+                announcement=self.announcement,
+                device=self.device,
+            ).status,
+            DeliveryLog.STATUS_PENDING,
+        )
+
+    @override_settings(
+        PUSH_DISPATCH_ON_PUBLISH=True,
+        PUSH_DISPATCH_ASYNC=True,
+        CELERY_TASK_ALWAYS_EAGER=False,
+    )
+    @patch('api.tasks.process_announcement_deliveries.delay')
+    def test_publish_queues_push_when_async_dispatch_is_enabled(self, delay):
+        self.authenticate_as_staff()
+
+        response = self.client.post(f'/api/announcements/{self.announcement.id}/publish/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        delay.assert_called_once_with(self.announcement.id)
+        self.assertEqual(response.data['push_dispatch']['queued'], True)
+        self.assertEqual(response.data['push_dispatch']['skipped'], False)
         self.assertEqual(
             DeliveryLog.objects.get(
                 announcement=self.announcement,
@@ -1240,3 +1488,51 @@ class AdminDashboardTests(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertContains(response, title)
             self.assertContains(response, 'Voltar para relatorios')
+
+    def test_admin_create_and_update_are_audited(self):
+        self.client.force_login(self.admin_user)
+
+        create_response = self.client.post(
+            '/admin/api/institution/add/',
+            {
+                'name': 'Prefeitura Auditada',
+                'kind': Institution.KIND_CITY_HALL,
+                'official_email': 'gabinete@example.com',
+                'phone_number': '51999999999',
+                'is_active': 'on',
+                '_save': 'Save',
+            },
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_302_FOUND)
+        institution = Institution.objects.get(name='Prefeitura Auditada')
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='admin_institution_created',
+                target_id=str(institution.id),
+            ).exists()
+        )
+
+        update_response = self.client.post(
+            f'/admin/api/institution/{institution.id}/change/',
+            {
+                'name': 'Prefeitura Auditada Atualizada',
+                'kind': Institution.KIND_CITY_HALL,
+                'official_email': 'gabinete@example.com',
+                'phone_number': '51999999999',
+                'is_active': 'on',
+                '_save': 'Save',
+            },
+        )
+
+        self.assertEqual(update_response.status_code, status.HTTP_302_FOUND)
+        institution.refresh_from_db()
+        self.assertEqual(institution.name, 'Prefeitura Auditada Atualizada')
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='admin_institution_updated',
+                target_id=str(institution.id),
+            ).exists()
+        )

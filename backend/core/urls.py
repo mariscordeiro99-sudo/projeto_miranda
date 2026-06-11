@@ -16,13 +16,13 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.shortcuts import redirect
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from api import admin_report_views
-from api.views import HelloView
+from api.health import DetailedHealthCheckView, HealthCheckView
 
 urlpatterns = [
     path('', lambda request: redirect('admin/')), 
@@ -32,9 +32,11 @@ urlpatterns = [
     path('admin/reports/delivery-failures/', admin_report_views.failed_deliveries_report, name='admin-report-delivery-failures'),
     path('admin/', admin.site.urls),
     path('auth/', include('api.auth_urls')),
-    path('health/', HelloView.as_view(), name='health'),
+    path('health/', HealthCheckView.as_view(), name='health'),
+    path('health/detailed/', DetailedHealthCheckView.as_view(), name='health-detailed'),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    re_path(r'^api/(?P<version>v[0-9]+)/', include('api.urls')),
     path('api/', include('api.urls')),
 ]
 

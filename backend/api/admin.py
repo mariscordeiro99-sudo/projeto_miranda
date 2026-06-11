@@ -1,5 +1,9 @@
 from django.contrib import admin
+from django.contrib.admin.sites import NotRegistered
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.contrib.auth.models import User
 
+from .audit import record_audit_log
 from .reports import build_dashboard_report
 from .models import (
     Announcement,
@@ -14,6 +18,50 @@ from .models import (
     Segment,
     VisualIdentity,
 )
+
+
+class AuditedAdminMixin:
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        action = 'updated' if change else 'created'
+        record_audit_log(
+            request.user,
+            f'admin_{obj._meta.model_name}_{action}',
+            obj,
+        )
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        deleted_objects = list(formset.deleted_objects)
+
+        for obj in instances:
+            action = 'updated' if obj.pk else 'created'
+            obj.save()
+            record_audit_log(
+                request.user,
+                f'admin_{obj._meta.model_name}_{action}',
+                obj,
+                {'parent': str(form.instance)},
+            )
+
+        formset.save_m2m()
+        for obj in deleted_objects:
+            record_audit_log(
+                request.user,
+                f'admin_{obj._meta.model_name}_delete_blocked',
+                obj,
+                {'parent': str(form.instance)},
+            )
+
+
+class NoDeleteAdminMixin:
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class NoDeleteInlineMixin:
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 admin.site.site_header = 'Administracao do Projeto Miranda'
@@ -33,48 +81,59 @@ def dashboard_index(request, extra_context=None):
 admin.site.index = dashboard_index
 
 
+try:
+    admin.site.unregister(User)
+except NotRegistered:
+    pass
+
+
+@admin.register(User)
+class UserAdmin(AuditedAdminMixin, NoDeleteAdminMixin, DjangoUserAdmin):
+    pass
+
+
 @admin.register(Document)
-class DocumentAdmin(admin.ModelAdmin):
+class DocumentAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('title', 'created_at')
     search_fields = ('title',)
 
 
 @admin.register(Profile)
-class ProfileAdmin(admin.ModelAdmin):
+class ProfileAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('user', 'phone_number', 'role', 'created_at')
     list_filter = ('role',)
     search_fields = ('user__username', 'user__email', 'phone_number')
 
 
 @admin.register(Institution)
-class InstitutionAdmin(admin.ModelAdmin):
+class InstitutionAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('name', 'kind', 'is_active', 'updated_at')
     list_filter = ('kind', 'is_active')
     search_fields = ('name', 'official_email')
 
 
 @admin.register(VisualIdentity)
-class VisualIdentityAdmin(admin.ModelAdmin):
+class VisualIdentityAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('institution', 'primary_color', 'secondary_color', 'updated_at')
     search_fields = ('institution__name',)
 
 
 @admin.register(Segment)
-class SegmentAdmin(admin.ModelAdmin):
+class SegmentAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('name', 'slug', 'is_active', 'updated_at')
     list_filter = ('is_active',)
     search_fields = ('name', 'slug', 'description')
     filter_horizontal = ('users', 'push_devices')
 
 
-class AttachmentInline(admin.TabularInline):
+class AttachmentInline(NoDeleteInlineMixin, admin.TabularInline):
     model = Attachment
     extra = 0
     readonly_fields = ('uploaded_at',)
 
 
 @admin.register(Announcement)
-class AnnouncementAdmin(admin.ModelAdmin):
+class AnnouncementAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('title', 'status', 'pinned', 'institution', 'author', 'published_at')
     list_filter = ('status', 'pinned', 'institution')
     search_fields = ('title', 'content')
@@ -83,28 +142,28 @@ class AnnouncementAdmin(admin.ModelAdmin):
 
 
 @admin.register(Attachment)
-class AttachmentAdmin(admin.ModelAdmin):
+class AttachmentAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('original_name', 'announcement', 'file_type', 'uploaded_at')
     list_filter = ('file_type',)
     search_fields = ('original_name', 'announcement__title')
 
 
 @admin.register(PushDevice)
-class PushDeviceAdmin(admin.ModelAdmin):
+class PushDeviceAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('platform', 'user', 'is_active', 'updated_at')
     list_filter = ('platform', 'is_active')
     search_fields = ('token', 'user__username', 'user__email')
 
 
 @admin.register(DeliveryLog)
-class DeliveryLogAdmin(admin.ModelAdmin):
+class DeliveryLogAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('announcement', 'recipient_user', 'channel', 'status', 'sent_at', 'viewed_at')
     list_filter = ('channel', 'status')
     search_fields = ('announcement__title', 'recipient_user__username', 'error_message')
 
 
 @admin.register(AuditLog)
-class AuditLogAdmin(admin.ModelAdmin):
+class AuditLogAdmin(NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('created_at', 'actor_username', 'action', 'target_type', 'target_id')
     list_filter = ('action', 'target_type', 'created_at')
     search_fields = ('actor_username', 'action', 'target_repr', 'target_id')
@@ -119,9 +178,12 @@ class AuditLogAdmin(admin.ModelAdmin):
         'created_at',
     )
 
+    def has_add_permission(self, request):
+        return False
+
 
 @admin.register(PrivacyRequest)
-class PrivacyRequestAdmin(admin.ModelAdmin):
+class PrivacyRequestAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('request_type', 'status', 'requester_email', 'user', 'created_at', 'resolved_at')
     list_filter = ('request_type', 'status', 'created_at')
     search_fields = ('requester_name', 'requester_email', 'user__username', 'notes')
