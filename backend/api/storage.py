@@ -9,6 +9,7 @@ from cloudinary.utils import cloudinary_url
 from django.conf import settings
 from django.core.files.storage import Storage
 from django.utils.text import get_valid_filename
+from whitenoise.storage import CompressedManifestStaticFilesStorage
 
 
 IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
@@ -116,3 +117,9 @@ class CloudinaryMediaStorage(Storage):
         resource_type, public_id, _ = _split_name(name)
         resource = cloudinary.api.resource(public_id, resource_type=resource_type)
         return resource.get('bytes', 0)
+
+
+class MirandaStaticFilesStorage(CompressedManifestStaticFilesStorage):
+    """Keep production static URLs resilient for Jazzmin directory references."""
+
+    manifest_strict = False

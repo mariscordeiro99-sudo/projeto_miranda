@@ -598,7 +598,7 @@ STORAGES = {
         "BACKEND": "api.storage.CloudinaryMediaStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "api.storage.MirandaStaticFilesStorage",
     },
 }
 
