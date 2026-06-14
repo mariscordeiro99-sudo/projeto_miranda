@@ -14,9 +14,9 @@ export const ProtectedRoute: React.FC = () => {
 
   const userObj = JSON.parse(storedUser);
   const usuarioLogadoId = userObj?.id || "u1";
+  const userRole = userObj?.role; 
 
   const permissoesSalvas = localStorage.getItem(`permissoes_${usuarioLogadoId}`);
-
   const permissoes = permissoesSalvas ? JSON.parse(permissoesSalvas) : {
     controlAcess: false,
     announcement: false,
@@ -24,7 +24,7 @@ export const ProtectedRoute: React.FC = () => {
     isAdmin: false
   };
 
-  if (permissoes.isAdmin) {
+  if (userRole === 'gestor' || permissoes.isAdmin) {
     return (
       <div className="app-layout">
         <NavBar />
@@ -35,16 +35,16 @@ export const ProtectedRoute: React.FC = () => {
     );
   }
 
-  if (location.pathname === '/controle-acesso' && !permissoes.controlAcess) {
-    return <Navigate to="/" replace />;
+  if (location.pathname === AppRoutes.DASHBOARD) {
+    return <Navigate to={AppRoutes.COMUNICADOS} replace />;
   }
 
-  if (location.pathname === '/edicao-comunicados' && !permissoes.announcement) {
-    return <Navigate to="/" replace />;
+  if (location.pathname === AppRoutes.CONTROLE_ACESSO && !permissoes.controlAcess) {
+    return <Navigate to={AppRoutes.COMUNICADOS} replace />;
   }
 
-  if (location.pathname === '/configuracoes/visual' && !permissoes.idtVisual) {
-    return <Navigate to="/" replace />;
+  if (location.pathname === AppRoutes.EDICAO_COMUNICADOS && !permissoes.announcement) {
+    return <Navigate to={AppRoutes.COMUNICADOS} replace />;
   }
 
   return (

@@ -54,7 +54,6 @@ export const AppRouter: React.FC = () => {
           <Route path={AppRoutes.CONVERSAS} element={<ConversationPage />} />
           <Route path={AppRoutes.EDICAO_COMUNICADOS} element={<AnnouncementsEdtPage />} />
           <Route path={AppRoutes.CONTROLE_ACESSO} element={<ControlAcessPage />} />
-
         </Route>
 
         <Route path="*" element={<Navigate to={AppRoutes.LOGIN} replace />} />
