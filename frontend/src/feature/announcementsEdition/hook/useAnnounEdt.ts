@@ -1,8 +1,28 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { ComunicadoAdmin, AnexoComunicado } from '../types/announEdt';
 
 export const useComunicadosAdmin = () => {
-    const [comunicados, setComunicados] = useState<ComunicadoAdmin[]>([]);
+    const [comunicados, setComunicados] = useState<ComunicadoAdmin[]>(() => {
+        const localDados = localStorage.getItem('nexa_comunicados_db');
+        if (localDados) {
+            return JSON.parse(localDados);
+        }
+
+        const mockDados: ComunicadoAdmin[] = [
+            {
+                id: "c1",
+                titulo: "Nova Diretriz de Segurança de Dados",
+                resumo: "Atualização importante sobre o uso de credenciais e acessos ao painel corporativo.",
+                texto: "Prezados colaboradores, a partir desta semana iniciamos a migração para autenticação baseada em tokens com expiração de 12 horas...",
+                status: "ativo",
+                dataCriacao: "28/05/2026",
+                anexos: [{ id: "a1", nome: "manual_seguranca.pdf", tipo: "pdf", url: "#" }]
+            }
+        ];
+        localStorage.setItem('nexa_comunicados_db', JSON.stringify(mockDados));
+        return mockDados;
+    });
+
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
     const [comunicadoEdicao, setComunicadoEdicao] = useState<ComunicadoAdmin | null>(null);
@@ -12,41 +32,6 @@ export const useComunicadosAdmin = () => {
     const [texto, setTexto] = useState('');
     const [anexos, setAnexos] = useState<AnexoComunicado[]>([]);
     const [erroUpload, setErroUpload] = useState<string | null>(null);
-
-    useEffect(() => {
-        let isMounted = true;
-
-        const buscarDadosDoBanco = async () => {
-            try {
-                // Simula a busca de comunicados cadastrados no banco Nexa
-                const mockDados: ComunicadoAdmin[] = [
-                    {
-                        id: "c1",
-                        titulo: "Nova Diretriz de Segurança de Dados",
-                        resumo: "Atualização importante sobre o uso de credenciais e acessos ao painel corporativo.",
-                        texto: "Prezados colaboradores, a partir desta semana iniciamos a migração para autenticação baseada em tokens com expiração de 12 horas...",
-                        status: "ativo",
-                        dataCriacao: "28/05/2026",
-                        anexos: [
-                            { id: "a1", nome: "manual_seguranca.pdf", tipo: "pdf", url: "#" }
-                        ]
-                    }
-                ];
-
-                if (isMounted) {
-                    setComunicados(mockDados);
-                }
-            } catch (error) {
-                console.error("Erro ao carregar comunicados:", error);
-            }
-        };
-
-        buscarDadosDoBanco();
-
-        return () => {
-            isMounted = false;
-        };
-    }, []);
 
     const abrirCriacao = useCallback(() => {
         setComunicadoEdicao(null);
@@ -105,14 +90,12 @@ export const useComunicadosAdmin = () => {
         };
 
         setAnexos(prev => [...prev, novoAnexo]);
-
         e.target.value = '';
     };
 
     const removerAnexo = useCallback((id: string) => {
         setAnexos(prev => {
             const filtrados = prev.filter(anexo => anexo.id !== id);
-            // Revoga a URL temporária para evitar vazamento de memória
             const removido = prev.find(anexo => anexo.id === id);
             if (removido && removido.url.startsWith('blob:')) {
                 URL.revokeObjectURL(removido.url);
@@ -125,10 +108,12 @@ export const useComunicadosAdmin = () => {
         e.preventDefault();
         if (!titulo.trim() || !resumo.trim() || !texto.trim()) return;
 
+        let listaAtualizada: ComunicadoAdmin[] = [];
+
         if (comunicadoEdicao) {
-            setComunicados(prev => prev.map(c => c.id === comunicadoEdicao.id ? {
+            listaAtualizada = comunicados.map(c => c.id === comunicadoEdicao.id ? {
                 ...c, titulo, resumo, texto, anexos
-            } : c));
+            } : c);
         } else {
             const novo: ComunicadoAdmin = {
                 id: `comunicado-${Date.now()}`,
@@ -139,20 +124,32 @@ export const useComunicadosAdmin = () => {
                 dataCriacao: new Date().toLocaleDateString('pt-BR'),
                 anexos
             };
-            setComunicados(prev => [novo, ...prev]);
+            listaAtualizada = [novo, ...comunicados];
         }
+
+        setComunicados(listaAtualizada);
+        localStorage.setItem('nexa_comunicados_db', JSON.stringify(listaAtualizada));
         setIsModalOpen(false);
     };
 
     const alternarStatus = useCallback((id: string) => {
-        setComunicados(prev => prev.map(c => c.id === id ? {
-            ...c, status: c.status === 'ativo' ? 'inativo' : 'ativo'
-        } : c));
+        setComunicados(prev => {
+            const listaAtualizada = prev.map(c => c.id === id ? {
+                ...c,
+                status: (c.status === 'ativo' ? 'inativo' : 'ativo') as "ativo" | "inativo" // 🎯 Correção aqui
+            } : c);
+            localStorage.setItem('nexa_comunicados_db', JSON.stringify(listaAtualizada));
+            return listaAtualizada;
+        });
     }, []);
 
     const apagarComunicado = useCallback((id: string) => {
         if (window.confirm("Deseja realmente excluir permanentemente este comunicado?")) {
-            setComunicados(prev => prev.filter(c => c.id !== id));
+            setComunicados(prev => {
+                const listaAtualizada = prev.filter(c => c.id !== id);
+                localStorage.setItem('nexa_comunicados_db', JSON.stringify(listaAtualizada));
+                return listaAtualizada;
+            });
         }
     }, []);
 

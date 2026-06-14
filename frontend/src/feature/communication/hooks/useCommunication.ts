@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Comunicado } from '../types/communication';
+import type { ComunicadoAdmin } from '../../announcementsEdition/types/announEdt'; 
 
 export const useComunicados = () => {
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
@@ -10,34 +11,43 @@ export const useComunicados = () => {
 
     const carregarComunicados = async () => {
       try {
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-        const dadosProvisorios: Comunicado[] = [
-          {
-            id: 1,
-            titulo: "Manutenção Preventiva do Sistema",
-            conteudo: "Informamos que no próximo domingo, entre as 02:00 e 05:00 da manhã, nosso sistema passará por uma atualização programada. Durante este período, o painel do gestor e as ferramentas de conversas poderão apresentar instabilidades momentâneas. Contamos com a compreensão de todos.",
-            data: "19 Mai 2026",
-            autor: "Suporte Técnico",
-            fixado: true
-          },
-          {
-            id: 2,
-            titulo: "Nova Funcionalidade: Identidade Visual Flexível",
-            conteudo: "Agora os gestores podem configurar as cores da instituição diretamente pelo painel de controle. A alteração reflete instantaneamente nos crachás virtuais e nas barras de navegação de todos os colaboradores associados.",
-            data: "18 Mai 2026",
-            autor: "Comunicação Interna",
-            imagemUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop",
-            fixado: false
-          }
-        ];
+        const bancoLocal = localStorage.getItem('nexa_comunicados_db');
+        
+        if (bancoLocal && isMounted) {
+          const dadosAdmin: ComunicadoAdmin[] = JSON.parse(bancoLocal);
+
+          const dadosAdaptados: Comunicado[] = dadosAdmin
+            .filter((item) => item.status === 'ativo')
+            .map((item) => {
+              const imagemAnexo = item.anexos?.find(anexo => anexo.tipo === 'image');
+
+              const idTratado = isNaN(Number(item.id)) 
+                ? item.id 
+                : Number(item.id);
+
+              return {
+                id: idTratado as Comunicado['id'], 
+                titulo: item.titulo,
+                conteudo: item.texto,   
+                data: item.dataCriacao,
+                autor: "Comunicação Nexa", 
+                imagemUrl: imagemAnexo ? imagemAnexo.url : undefined,
+                fixado: false 
+              };
+            });
+
+          setComunicados(dadosAdaptados);
+        } else if (isMounted) {
+          setComunicados([]);
+        }
 
         if (isMounted) {
-          setComunicados(dadosProvisorios);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error("Erro ao carregar os comunicados:", error);
+        console.error("Erro ao carregar e mapear comunicados:", error);
         if (isMounted) {
           setIsLoading(false);
         }
