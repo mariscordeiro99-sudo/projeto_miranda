@@ -21,7 +21,7 @@ class Profile(models.Model):
     ROLE_CITIZEN = 'citizen'
     ROLE_MANAGER = 'manager'
     ROLE_CHOICES = [
-        (ROLE_CITIZEN, 'Cidadao'),
+        (ROLE_CITIZEN, 'Cidadão'),
         (ROLE_MANAGER, 'Gestor'),
     ]
 
@@ -49,7 +49,7 @@ class Institution(models.Model):
     KIND_COUNCIL = 'council'
     KIND_CHOICES = [
         (KIND_CITY_HALL, 'Prefeitura'),
-        (KIND_COUNCIL, 'Camara'),
+        (KIND_COUNCIL, 'Câmara'),
     ]
 
     name = models.CharField(max_length=180)
@@ -61,8 +61,8 @@ class Institution(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = 'Instituicao'
-        verbose_name_plural = 'Instituicoes'
+        verbose_name = 'Instituição'
+        verbose_name_plural = 'Instituições'
 
     def __str__(self):
         return self.name
@@ -183,7 +183,7 @@ class Attachment(models.Model):
     TYPE_CHOICES = [
         (TYPE_DOCUMENT, 'Documento'),
         (TYPE_IMAGE, 'Imagem'),
-        (TYPE_VIDEO, 'Video'),
+        (TYPE_VIDEO, 'Vídeo'),
         (TYPE_OTHER, 'Outro'),
     ]
 
@@ -239,7 +239,7 @@ class PushDevice(models.Model):
 class DeliveryLog(models.Model):
     CHANNEL_PUSH = 'push'
     CHANNEL_CHOICES = [
-        (CHANNEL_PUSH, 'Notificacao push'),
+        (CHANNEL_PUSH, 'Notificação push'),
     ]
 
     STATUS_PENDING = 'pending'
@@ -334,9 +334,9 @@ class PrivacyRequest(models.Model):
     TYPE_EXPORT = 'export'
     TYPE_DEACTIVATION = 'deactivation'
     TYPE_CHOICES = [
-        (TYPE_ERASURE, 'Exclusao de dados'),
-        (TYPE_EXPORT, 'Exportacao de dados'),
-        (TYPE_DEACTIVATION, 'Desativacao de conta'),
+        (TYPE_ERASURE, 'Exclusão de dados'),
+        (TYPE_EXPORT, 'Exportação de dados'),
+        (TYPE_DEACTIVATION, 'Desativação de conta'),
     ]
 
     STATUS_PENDING = 'pending'
@@ -344,7 +344,7 @@ class PrivacyRequest(models.Model):
     STATUS_REJECTED = 'rejected'
     STATUS_CHOICES = [
         (STATUS_PENDING, 'Pendente'),
-        (STATUS_COMPLETED, 'Concluida'),
+        (STATUS_COMPLETED, 'Concluída'),
         (STATUS_REJECTED, 'Rejeitada'),
     ]
 
@@ -371,8 +371,8 @@ class PrivacyRequest(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Solicitacao LGPD'
-        verbose_name_plural = 'Solicitacoes LGPD'
+        verbose_name = 'Solicitação LGPD'
+        verbose_name_plural = 'Solicitações LGPD'
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['user', 'created_at']),

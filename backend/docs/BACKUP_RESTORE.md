@@ -23,6 +23,51 @@ Dados fora do backup do banco:
 - Teste de restauracao: mensal ou antes de apresentacoes/deploys importantes.
 - Responsavel: administrador tecnico do backend.
 
+## Prova operacional no backend
+
+O backend possui uma verificacao operacional para transformar a politica em
+evidencia auditavel:
+
+- variaveis de politica no deploy:
+  - `BACKUP_PROVIDER`
+  - `BACKUP_FREQUENCY_HOURS`
+  - `BACKUP_MIN_RETENTION_DAYS`
+  - `BACKUP_RETENTION_DAYS`
+  - `BACKUP_RESTORE_TEST_INTERVAL_DAYS`
+  - `BACKUP_LAST_RESTORE_TEST_AT`
+  - `BACKUP_EVIDENCE_URL`
+- componente `backup_policy` em `GET /health/detailed/`, disponivel para admin;
+- task diaria `api.tasks.record_backup_operational_evidence`, agendada no
+  Celery beat;
+- registros de auditoria com action `backup_operational_evidence`;
+- comando manual `python manage.py verify_backup_operability`.
+
+Para considerar a prova como saudavel:
+
+1. `BACKUP_PROVIDER` deve indicar o provedor usado, por exemplo `aiven`.
+2. `BACKUP_FREQUENCY_HOURS` deve ser `24` ou menor.
+3. `BACKUP_RETENTION_DAYS` deve atender `BACKUP_MIN_RETENTION_DAYS`.
+4. `BACKUP_LAST_RESTORE_TEST_AT` deve conter a data ISO do ultimo teste de restore.
+5. Deve existir evidencia recente em `AuditLog`, criada automaticamente pelo
+   Celery beat ou manualmente pelo comando abaixo.
+
+Registrar evidencia manual depois de conferir o painel da Aiven ou concluir um
+teste de restore:
+
+```bash
+python manage.py verify_backup_operability --record --json
+```
+
+Consultar a ultima evidencia:
+
+```bash
+python manage.py shell -c "from api.models import AuditLog; print(AuditLog.objects.filter(action='backup_operational_evidence').latest('created_at').metadata)"
+```
+
+O campo `BACKUP_EVIDENCE_URL` pode apontar para um documento interno, ticket,
+ata ou print armazenado fora do repositorio com a confirmacao do painel Aiven ou
+do teste de restore. Nao commitar arquivos com dados pessoais ou segredos.
+
 ## Checklist no Aiven
 
 No painel da Aiven:
@@ -155,6 +200,13 @@ DB_HOST
 DB_PORT
 DB_CA_CERT
 DB_SSL_REQUIRED
+BACKUP_PROVIDER
+BACKUP_FREQUENCY_HOURS
+BACKUP_MIN_RETENTION_DAYS
+BACKUP_RETENTION_DAYS
+BACKUP_RESTORE_TEST_INTERVAL_DAYS
+BACKUP_LAST_RESTORE_TEST_AT
+BACKUP_EVIDENCE_URL
 CLOUDINARY_CLOUD_NAME
 CLOUDINARY_API_KEY
 CLOUDINARY_API_SECRET

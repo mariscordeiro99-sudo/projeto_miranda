@@ -1,7 +1,9 @@
 import struct
 import tempfile
 from datetime import timedelta
+from pathlib import Path
 from shutil import rmtree
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -18,6 +20,11 @@ from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.test import APITestCase
 
+from .backup import (
+    build_backup_operational_status,
+    check_database_ssl,
+    record_backup_operational_evidence,
+)
 from .models import (
     Announcement,
     Attachment,
@@ -29,7 +36,8 @@ from .models import (
     PushDevice,
     Segment,
 )
-from .media_validation import validate_attachment
+from .media_processing import prepare_attachment
+from .media_validation import MAX_VIDEO_SOURCE_SIZE, validate_attachment
 from .reports import build_dashboard_report
 
 
@@ -495,6 +503,35 @@ class PrivacyAndAuditTests(APITestCase):
         self.assertEqual(len(list_response.data['results']), 1)
 
     def test_admin_can_complete_privacy_request(self):
+        Token.objects.create(user=self.citizen_user)
+        segment = Segment.objects.create(
+            name='Bairro Centro',
+            slug='bairro-centro',
+        )
+        segment.users.add(self.citizen_user)
+        device = PushDevice.objects.create(
+            user=self.citizen_user,
+            token='token-export-lgpd',
+            platform=PushDevice.PLATFORM_WEB,
+        )
+        announcement = Announcement.objects.create(
+            author=self.admin_user,
+            title='Comunicado oficial',
+            content='Conteudo do comunicado',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+        DeliveryLog.objects.create(
+            announcement=announcement,
+            device=device,
+            recipient_user=self.citizen_user,
+            status=DeliveryLog.STATUS_VIEWED,
+            viewed_at=timezone.now(),
+        )
+        AuditLog.objects.create(
+            actor=self.citizen_user,
+            actor_username=self.citizen_user.username,
+            action='profile_updated',
+        )
         privacy_request = PrivacyRequest.objects.create(
             user=self.citizen_user,
             requester_name='Cidadao LGPD',
@@ -510,10 +547,24 @@ class PrivacyAndAuditTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['lgpd_action'], 'export')
+        self.assertIn('export', response.data)
+        self.assertEqual(response.data['export']['user']['email'], self.citizen_user.email)
+        self.assertEqual(response.data['export']['profile']['phone_number'], '51922222222')
+        self.assertEqual(response.data['export']['push_devices'][0]['token'], 'token-export-lgpd')
+        self.assertEqual(response.data['export']['delivery_logs'][0]['status'], DeliveryLog.STATUS_VIEWED)
+        self.assertEqual(response.data['export']['segments'][0]['slug'], 'bairro-centro')
+        self.assertEqual(response.data['export']['auth_tokens']['active_count'], 1)
         privacy_request.refresh_from_db()
         self.assertEqual(privacy_request.status, PrivacyRequest.STATUS_COMPLETED)
         self.assertEqual(privacy_request.resolved_by, self.admin_user)
         self.assertIsNotNone(privacy_request.resolved_at)
+        completion_log = AuditLog.objects.get(
+            action='privacy_request_completed',
+            target_id=str(privacy_request.id),
+        )
+        self.assertEqual(completion_log.metadata['action'], 'export')
+        self.assertNotIn('export', completion_log.metadata)
         self.assertTrue(
             AuditLog.objects.filter(
                 actor=self.admin_user,
@@ -521,6 +572,142 @@ class PrivacyAndAuditTests(APITestCase):
                 target_id=str(privacy_request.id),
             ).exists()
         )
+
+    def test_admin_can_complete_erasure_request_and_anonymize_user_data(self):
+        auth_token = Token.objects.create(user=self.citizen_user)
+        segment = Segment.objects.create(
+            name='Zona Norte',
+            slug='zona-norte',
+        )
+        segment.users.add(self.citizen_user)
+        device = PushDevice.objects.create(
+            user=self.citizen_user,
+            token='token-erasure-lgpd',
+            platform=PushDevice.PLATFORM_ANDROID,
+        )
+        announcement = Announcement.objects.create(
+            author=self.admin_user,
+            title='Aviso de obras',
+            content='Rua em manutencao',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+        delivery_log = DeliveryLog.objects.create(
+            announcement=announcement,
+            device=device,
+            recipient_user=self.citizen_user,
+            status=DeliveryLog.STATUS_FAILED,
+            error_message='token-erasure-lgpd invalido',
+        )
+        actor_log = AuditLog.objects.create(
+            actor=self.citizen_user,
+            actor_username=self.citizen_user.username,
+            action='privacy_request_created',
+        )
+        privacy_request = PrivacyRequest.objects.create(
+            user=self.citizen_user,
+            requester_name='Cidadao LGPD',
+            requester_email=self.citizen_user.email,
+            request_type=PrivacyRequest.TYPE_ERASURE,
+        )
+        self.authenticate_as(self.admin_user)
+
+        response = self.client.post(
+            f'/api/privacy-requests/{privacy_request.id}/complete/',
+            {'notes': 'Dados pessoais anonimizados.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['lgpd_action'], 'erasure')
+        self.assertNotIn('export', response.data)
+
+        self.citizen_user.refresh_from_db()
+        self.assertFalse(self.citizen_user.is_active)
+        self.assertEqual(self.citizen_user.email, '')
+        self.assertEqual(self.citizen_user.first_name, '')
+        self.assertEqual(self.citizen_user.last_name, '')
+        self.assertTrue(self.citizen_user.username.startswith('erased_user_'))
+        self.assertFalse(self.citizen_user.has_usable_password())
+        self.assertFalse(Token.objects.filter(key=auth_token.key).exists())
+
+        self.citizen_user.profile.refresh_from_db()
+        self.assertEqual(self.citizen_user.profile.phone_number, '')
+        self.assertFalse(self.citizen_user.profile.profile_picture)
+        self.assertFalse(segment.users.filter(id=self.citizen_user.id).exists())
+
+        device.refresh_from_db()
+        self.assertIsNone(device.user)
+        self.assertFalse(device.is_active)
+        self.assertTrue(device.token.startswith('erased-device-'))
+
+        delivery_log.refresh_from_db()
+        self.assertIsNone(delivery_log.recipient_user)
+        self.assertEqual(delivery_log.error_message, '')
+
+        privacy_request.refresh_from_db()
+        self.assertEqual(privacy_request.status, PrivacyRequest.STATUS_COMPLETED)
+        self.assertIsNone(privacy_request.user)
+        self.assertEqual(privacy_request.requester_name, 'Titular anonimizado')
+        self.assertEqual(privacy_request.requester_email, '')
+        self.assertEqual(privacy_request.resolved_by, self.admin_user)
+
+        actor_log.refresh_from_db()
+        self.assertIsNone(actor_log.actor)
+        self.assertEqual(actor_log.actor_username, 'usuario_anonimizado')
+
+    def test_admin_can_complete_deactivation_request(self):
+        auth_token = Token.objects.create(user=self.citizen_user)
+        device = PushDevice.objects.create(
+            user=self.citizen_user,
+            token='token-deactivation-lgpd',
+            platform=PushDevice.PLATFORM_IOS,
+        )
+        privacy_request = PrivacyRequest.objects.create(
+            user=self.citizen_user,
+            requester_name='Cidadao LGPD',
+            requester_email=self.citizen_user.email,
+            request_type=PrivacyRequest.TYPE_DEACTIVATION,
+        )
+        self.authenticate_as(self.admin_user)
+
+        response = self.client.post(
+            f'/api/privacy-requests/{privacy_request.id}/complete/',
+            {'notes': 'Conta desativada.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['lgpd_action'], 'deactivation')
+        self.citizen_user.refresh_from_db()
+        self.assertFalse(self.citizen_user.is_active)
+        self.assertEqual(self.citizen_user.email, 'cidadao_lgpd@example.com')
+        self.assertFalse(Token.objects.filter(key=auth_token.key).exists())
+        device.refresh_from_db()
+        self.assertEqual(device.user, self.citizen_user)
+        self.assertFalse(device.is_active)
+        privacy_request.refresh_from_db()
+        self.assertEqual(privacy_request.status, PrivacyRequest.STATUS_COMPLETED)
+        self.assertEqual(privacy_request.user, self.citizen_user)
+
+    def test_admin_cannot_complete_already_resolved_privacy_request(self):
+        privacy_request = PrivacyRequest.objects.create(
+            user=self.citizen_user,
+            requester_name='Cidadao LGPD',
+            requester_email=self.citizen_user.email,
+            request_type=PrivacyRequest.TYPE_DEACTIVATION,
+            status=PrivacyRequest.STATUS_COMPLETED,
+            resolved_by=self.admin_user,
+            resolved_at=timezone.now(),
+        )
+        self.authenticate_as(self.admin_user)
+
+        response = self.client.post(
+            f'/api/privacy-requests/{privacy_request.id}/complete/',
+            {'notes': 'Tentativa duplicada.'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_citizen_can_deactivate_own_account_and_token_is_revoked(self):
         token = self.authenticate_as(self.citizen_user)
@@ -578,6 +765,15 @@ class AttachmentValidationTests(APITestCase):
         with self.assertRaises(DRFValidationError):
             validate_attachment(uploaded_file)
 
+    def test_video_source_over_250mb_is_blocked_before_processing(self):
+        uploaded_file = SizedUpload(
+            size=MAX_VIDEO_SOURCE_SIZE + 1,
+            content_type='video/mp4',
+        )
+
+        with self.assertRaises(DRFValidationError):
+            validate_attachment(uploaded_file)
+
     def test_unsupported_attachment_type_is_blocked(self):
         uploaded_file = SimpleUploadedFile(
             'script.exe',
@@ -587,6 +783,76 @@ class AttachmentValidationTests(APITestCase):
 
         with self.assertRaises(DRFValidationError):
             validate_attachment(uploaded_file)
+
+
+class VideoCompressionTests(APITestCase):
+    @override_settings(
+        VIDEO_COMPRESSION_ENABLED=True,
+        VIDEO_COMPRESSION_MAX_DIMENSION=1280,
+        VIDEO_COMPRESSION_CRF=28,
+        VIDEO_COMPRESSION_PRESET='medium',
+        VIDEO_COMPRESSION_AUDIO_BITRATE='96k',
+        VIDEO_COMPRESSION_TIMEOUT_SECONDS=30,
+    )
+    def test_video_is_converted_to_optimized_mp4(self):
+        uploaded_file = SimpleUploadedFile(
+            'video-original.mov',
+            mp4_file_with_duration(30),
+            content_type='video/quicktime',
+        )
+
+        def fake_ffmpeg(command, **kwargs):
+            Path(command[-1]).write_bytes(b'optimized-video')
+            return SimpleNamespace(returncode=0, stderr='')
+
+        with (
+            patch(
+                'api.media_processing.get_ffmpeg_executable',
+                return_value='ffmpeg',
+            ),
+            patch(
+                'api.media_processing.subprocess.run',
+                side_effect=fake_ffmpeg,
+            ) as run_mock,
+        ):
+            prepared_file = prepare_attachment(uploaded_file)
+
+        self.assertEqual(prepared_file.name, 'video-original.mp4')
+        self.assertEqual(prepared_file.content_type, 'video/mp4')
+        self.assertEqual(prepared_file.read(), b'optimized-video')
+
+        command = run_mock.call_args.args[0]
+        self.assertIn('libx264', command)
+        self.assertIn('aac', command)
+        self.assertIn('+faststart', command)
+        self.assertTrue(any('1280' in argument for argument in command))
+
+    @override_settings(VIDEO_COMPRESSION_ENABLED=True)
+    def test_video_is_rejected_when_ffmpeg_is_unavailable(self):
+        uploaded_file = SimpleUploadedFile(
+            'video.mp4',
+            mp4_file_with_duration(30),
+            content_type='video/mp4',
+        )
+
+        with (
+            patch(
+                'api.media_processing.get_ffmpeg_executable',
+                return_value=None,
+            ),
+            self.assertRaises(DRFValidationError),
+        ):
+            prepare_attachment(uploaded_file)
+
+    @override_settings(VIDEO_COMPRESSION_ENABLED=False)
+    def test_video_is_not_changed_when_compression_is_explicitly_disabled(self):
+        uploaded_file = SimpleUploadedFile(
+            'video.mp4',
+            mp4_file_with_duration(30),
+            content_type='video/mp4',
+        )
+
+        self.assertIs(prepare_attachment(uploaded_file), uploaded_file)
 
 
 class AttachmentUploadAPITests(APITestCase):
@@ -698,6 +964,77 @@ class AttachmentUploadAPITests(APITestCase):
         attachment = Attachment.objects.get(id=response.data['id'])
         self.assertEqual(attachment.original_name, 'foto.png')
         self.assertEqual(attachment.file_type, Attachment.TYPE_IMAGE)
+
+    def test_attachment_endpoint_persists_the_optimized_video(self):
+        self.authenticate_as_staff()
+        announcement = Announcement.objects.create(
+            author=self.staff_user,
+            title='Comunicado video',
+            content='Conteudo',
+            status=Announcement.STATUS_DRAFT,
+        )
+        optimized_file = SimpleUploadedFile(
+            'video-institucional.mp4',
+            b'optimized-video',
+            content_type='video/mp4',
+        )
+
+        with (
+            override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages),
+            patch('api.views.prepare_attachment', return_value=optimized_file),
+        ):
+            response = self.client.post(
+                '/api/attachments/',
+                {
+                    'announcement': announcement.id,
+                    'file': SimpleUploadedFile(
+                        'video-institucional.mov',
+                        mp4_file_with_duration(30),
+                        content_type='video/quicktime',
+                    ),
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        attachment = Attachment.objects.get(id=response.data['id'])
+        self.assertEqual(attachment.original_name, 'video-institucional.mp4')
+        self.assertEqual(attachment.file_type, Attachment.TYPE_VIDEO)
+        self.assertTrue(attachment.file.name.endswith('.mp4'))
+
+    def test_video_compression_failure_does_not_persist_announcement(self):
+        self.authenticate_as_staff()
+
+        with (
+            override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages),
+            patch(
+                'api.views.prepare_attachment',
+                side_effect=DRFValidationError('Falha ao comprimir video.'),
+            ),
+        ):
+            response = self.client.post(
+                '/api/announcements/',
+                {
+                    'title': 'Comunicado com falha de video',
+                    'content': 'Nao deve ser persistido.',
+                    'status': Announcement.STATUS_DRAFT,
+                    'attachments': [
+                        SimpleUploadedFile(
+                            'video.mp4',
+                            mp4_file_with_duration(30),
+                            content_type='video/mp4',
+                        ),
+                    ],
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(
+            Announcement.objects.filter(
+                title='Comunicado com falha de video'
+            ).exists()
+        )
 
     def test_invalid_attachment_upload_is_rejected_before_announcement_is_saved(self):
         self.authenticate_as_staff()
@@ -890,6 +1227,54 @@ class DestructiveDeleteProtectionTests(APITestCase):
         self.assertTrue(DeliveryLog.objects.filter(id=self.delivery_log.id).exists())
 
 
+class BackupOperationalEvidenceTests(APITestCase):
+    def test_backup_status_flags_missing_restore_test_date(self):
+        with override_settings(
+            BACKUP_PROVIDER='aiven',
+            BACKUP_FREQUENCY_HOURS=24,
+            BACKUP_MIN_RETENTION_DAYS=30,
+            BACKUP_RETENTION_DAYS=30,
+            BACKUP_RESTORE_TEST_INTERVAL_DAYS=30,
+            BACKUP_LAST_RESTORE_TEST_AT='',
+            BACKUP_EVIDENCE_URL='',
+        ):
+            result = build_backup_operational_status(
+                now=timezone.now(),
+                include_evidence=False,
+            )
+
+        self.assertEqual(result['checks']['restore_test']['status'], 'degraded')
+        self.assertIn('BACKUP_LAST_RESTORE_TEST_AT', result['checks']['restore_test']['detail'])
+
+    def test_database_ssl_check_accepts_mysql_with_ssl(self):
+        with (
+            override_settings(DB_SSL_REQUIRED=True),
+            patch(
+                'api.backup.settings.DATABASES',
+                {
+                    'default': {
+                        'ENGINE': 'django.db.backends.mysql',
+                        'OPTIONS': {'ssl': {}},
+                    },
+                },
+            ),
+        ):
+            result = check_database_ssl()
+
+        self.assertEqual(result['status'], 'healthy')
+
+    def test_record_backup_operational_evidence_creates_audit_log(self):
+        result = record_backup_operational_evidence()
+
+        self.assertIn('audit_log_id', result)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                id=result['audit_log_id'],
+                action='backup_operational_evidence',
+            ).exists()
+        )
+
+
 class HealthCheckTests(APITestCase):
     def test_simple_health_check_is_public(self):
         response = self.client.get('/health/')
@@ -916,12 +1301,21 @@ class HealthCheckTests(APITestCase):
         token = Token.objects.create(user=admin_user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
 
-        response = self.client.get('/health/detailed/')
+        with patch(
+            'api.health.get_ffmpeg_executable',
+            return_value='ffmpeg',
+        ):
+            response = self.client.get('/health/detailed/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn(response.data['status'], ['healthy', 'degraded'])
         self.assertIn('database', response.data['components'])
         self.assertIn('cache', response.data['components'])
+        self.assertIn('backup_policy', response.data['components'])
+        self.assertEqual(
+            response.data['components']['video_processing']['status'],
+            'healthy',
+        )
 
 
 class ApiVersioningTests(APITestCase):
@@ -1658,6 +2052,19 @@ class AdminDashboardTests(APITestCase):
             self.assertEqual(response.status_code, status.HTTP_200_OK)
             self.assertContains(response, title)
             self.assertContains(response, 'Voltar para relatórios')
+
+    def test_active_users_report_separates_citizens_and_administrators(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get('/admin/reports/users-active/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertContains(response, 'Usu\u00e1rios cidad\u00e3os ativos')
+        self.assertContains(response, 'Administradores ativos')
+        self.assertContains(response, self.citizen_user.username)
+        self.assertContains(response, self.admin_user.username)
+        self.assertContains(response, 'Cidad\u00e3o')
+        self.assertContains(response, 'Administrador')
 
     def test_admin_create_and_update_are_audited(self):
         self.client.force_login(self.admin_user)

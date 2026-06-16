@@ -41,6 +41,20 @@ services:
         sync: false
       - key: DB_SSL_REQUIRED
         value: "true"
+      - key: BACKUP_PROVIDER
+        value: aiven
+      - key: BACKUP_FREQUENCY_HOURS
+        value: "24"
+      - key: BACKUP_MIN_RETENTION_DAYS
+        value: "30"
+      - key: BACKUP_RETENTION_DAYS
+        value: "30"
+      - key: BACKUP_RESTORE_TEST_INTERVAL_DAYS
+        value: "30"
+      - key: BACKUP_LAST_RESTORE_TEST_AT
+        sync: false
+      - key: BACKUP_EVIDENCE_URL
+        sync: false
       - key: CORS_ALLOW_ALL_ORIGINS
         value: "false"
       - key: PUSH_DISPATCH_ON_PUBLISH
@@ -59,6 +73,20 @@ services:
         value: "1000/hour"
       - key: CACHE_TIMEOUT
         value: "300"
+      - key: VIDEO_COMPRESSION_ENABLED
+        value: "true"
+      - key: VIDEO_COMPRESSION_MAX_DIMENSION
+        value: "1280"
+      - key: VIDEO_COMPRESSION_CRF
+        value: "28"
+      - key: VIDEO_COMPRESSION_PRESET
+        value: medium
+      - key: VIDEO_COMPRESSION_AUDIO_BITRATE
+        value: 96k
+      - key: VIDEO_COMPRESSION_TIMEOUT_SECONDS
+        value: "180"
+      - key: MAX_COMPRESSED_VIDEO_SIZE_MB
+        value: "60"
       - key: REDIS_URL
         fromService:
           type: redis
@@ -118,6 +146,20 @@ services:
         sync: false
       - key: DB_SSL_REQUIRED
         value: "true"
+      - key: BACKUP_PROVIDER
+        value: aiven
+      - key: BACKUP_FREQUENCY_HOURS
+        value: "24"
+      - key: BACKUP_MIN_RETENTION_DAYS
+        value: "30"
+      - key: BACKUP_RETENTION_DAYS
+        value: "30"
+      - key: BACKUP_RESTORE_TEST_INTERVAL_DAYS
+        value: "30"
+      - key: BACKUP_LAST_RESTORE_TEST_AT
+        sync: false
+      - key: BACKUP_EVIDENCE_URL
+        sync: false
       - key: CORS_ALLOW_ALL_ORIGINS
         value: "false"
       - key: PUSH_DISPATCH_ON_PUBLISH
@@ -130,6 +172,20 @@ services:
         value: "true"
       - key: CACHE_TIMEOUT
         value: "300"
+      - key: VIDEO_COMPRESSION_ENABLED
+        value: "true"
+      - key: VIDEO_COMPRESSION_MAX_DIMENSION
+        value: "1280"
+      - key: VIDEO_COMPRESSION_CRF
+        value: "28"
+      - key: VIDEO_COMPRESSION_PRESET
+        value: medium
+      - key: VIDEO_COMPRESSION_AUDIO_BITRATE
+        value: 96k
+      - key: VIDEO_COMPRESSION_TIMEOUT_SECONDS
+        value: "180"
+      - key: MAX_COMPRESSED_VIDEO_SIZE_MB
+        value: "60"
       - key: REDIS_URL
         fromService:
           type: redis
@@ -185,6 +241,20 @@ services:
         sync: false
       - key: DB_SSL_REQUIRED
         value: "true"
+      - key: BACKUP_PROVIDER
+        value: aiven
+      - key: BACKUP_FREQUENCY_HOURS
+        value: "24"
+      - key: BACKUP_MIN_RETENTION_DAYS
+        value: "30"
+      - key: BACKUP_RETENTION_DAYS
+        value: "30"
+      - key: BACKUP_RESTORE_TEST_INTERVAL_DAYS
+        value: "30"
+      - key: BACKUP_LAST_RESTORE_TEST_AT
+        sync: false
+      - key: BACKUP_EVIDENCE_URL
+        sync: false
       - key: CORS_ALLOW_ALL_ORIGINS
         value: "false"
       - key: PUSH_DISPATCH_ASYNC

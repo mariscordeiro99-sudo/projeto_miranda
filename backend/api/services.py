@@ -3,13 +3,7 @@ from django.utils import timezone
 
 from .models import DeliveryLog
 
-try:
-    import firebase_admin
-    from firebase_admin import credentials, messaging
-except ImportError:  # pragma: no cover - dependency may be absent locally before install
-    firebase_admin = None
-    credentials = None
-    messaging = None
+_firebase_modules = None
 
 
 def normalize_firebase_private_key(private_key):
@@ -37,13 +31,33 @@ class PushNotificationService:
     def is_configured(self):
         return bool(
             self.enabled
-            and firebase_admin
+            and self.firebase_modules[0]
             and self.project_id
             and self.client_email
             and self.private_key
         )
 
+    @property
+    def firebase_modules(self):
+        global _firebase_modules
+        if _firebase_modules is not None:
+            return _firebase_modules
+
+        if not self.enabled:
+            return (None, None, None)
+
+        try:
+            import firebase_admin
+            from firebase_admin import credentials, messaging
+        except ImportError:  # pragma: no cover - dependency may be absent locally before install
+            _firebase_modules = (None, None, None)
+            return _firebase_modules
+
+        _firebase_modules = (firebase_admin, credentials, messaging)
+        return _firebase_modules
+
     def get_app(self):
+        firebase_admin, credentials, _ = self.firebase_modules
         if firebase_admin._apps:
             return firebase_admin.get_app()
 
@@ -72,9 +86,10 @@ class PushNotificationService:
             return result
 
         app = self.get_app()
+        _, _, messaging = self.firebase_modules
         for log in logs.select_related('device', 'announcement'):
             if not log.device or not log.device.is_active:
-                self.mark_failed(log, 'Device is inactive or missing.')
+                self.mark_failed(log, 'Dispositivo ausente ou inativo.')
                 result['failed'] += 1
                 continue
 

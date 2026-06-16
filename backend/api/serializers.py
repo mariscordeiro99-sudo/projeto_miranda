@@ -93,22 +93,22 @@ class ManagerSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if self.instance is None and not attrs.get('password'):
-            raise serializers.ValidationError({'password': 'password is required.'})
+            raise serializers.ValidationError({'password': 'Senha obrigatória.'})
 
         username = attrs.get('username')
         if self.instance is None and not username:
-            raise serializers.ValidationError({'username': 'username is required.'})
+            raise serializers.ValidationError({'username': 'Usuário obrigatório.'})
 
         email = attrs.get('email', '')
         if self.instance is None and not email:
-            raise serializers.ValidationError({'email': 'email is required.'})
+            raise serializers.ValidationError({'email': 'E-mail obrigatório.'})
 
         user_id = self.instance.id if self.instance else None
         if username and User.objects.exclude(id=user_id).filter(username=username).exists():
-            raise serializers.ValidationError({'username': 'username already exists.'})
+            raise serializers.ValidationError({'username': 'Este usuário já existe.'})
 
         if email and User.objects.exclude(id=user_id).filter(email__iexact=email).exists():
-            raise serializers.ValidationError({'email': 'email already exists.'})
+            raise serializers.ValidationError({'email': 'Este e-mail já existe.'})
 
         password = attrs.get('password')
         if password:

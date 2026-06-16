@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 
 class Command(BaseCommand):
-    help = 'Create or update a Django admin user from environment variables.'
+    help = 'Cria ou atualiza um usuário administrador do Django usando variáveis de ambiente.'
 
     def handle(self, *args, **options):
         username = os.getenv('DJANGO_SUPERUSER_USERNAME', '').strip()
@@ -13,9 +13,9 @@ class Command(BaseCommand):
         password = os.getenv('DJANGO_SUPERUSER_PASSWORD', '')
 
         if not username:
-            raise CommandError('DJANGO_SUPERUSER_USERNAME is required.')
+            raise CommandError('DJANGO_SUPERUSER_USERNAME é obrigatório.')
         if not password:
-            raise CommandError('DJANGO_SUPERUSER_PASSWORD is required.')
+            raise CommandError('DJANGO_SUPERUSER_PASSWORD é obrigatório.')
 
         User = get_user_model()
         user, created = User.objects.get_or_create(
@@ -32,5 +32,5 @@ class Command(BaseCommand):
         user.set_password(password)
         user.save()
 
-        action = 'created' if created else 'updated'
-        self.stdout.write(self.style.SUCCESS(f'Admin user "{username}" {action}.'))
+        action = 'criado' if created else 'atualizado'
+        self.stdout.write(self.style.SUCCESS(f'Usuário administrador "{username}" {action}.'))

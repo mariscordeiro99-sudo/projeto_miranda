@@ -56,6 +56,6 @@ class BearerOrTokenAuthentication(TokenAuthentication):
         ttl = manager_token_ttl_seconds(user)
         if ttl and token.created + timedelta(seconds=ttl) < timezone.now():
             token.delete()
-            raise exceptions.AuthenticationFailed('Token has expired.')
+            raise exceptions.AuthenticationFailed('Token expirado.')
 
         return user, token

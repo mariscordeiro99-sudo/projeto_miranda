@@ -23,7 +23,9 @@ from .models import (
     Segment,
     VisualIdentity,
 )
-from .media_validation import attachment_type, validate_attachment
+from .media_processing import prepare_attachment
+from .media_validation import attachment_type
+from .privacy import process_privacy_request
 from .reports import build_dashboard_report
 from .serializers import (
     AnnouncementSerializer,
@@ -184,18 +186,27 @@ class PrivacyRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None, **kwargs):
         privacy_request = self.get_object()
-        privacy_request.status = PrivacyRequest.STATUS_COMPLETED
-        privacy_request.notes = request.data.get('notes', privacy_request.notes)
-        privacy_request.resolved_by = request.user
-        privacy_request.resolved_at = timezone.now()
-        privacy_request.save(update_fields=['status', 'notes', 'resolved_by', 'resolved_at'])
+        privacy_request, result = process_privacy_request(
+            privacy_request,
+            request.user,
+            notes=request.data.get('notes'),
+        )
         record_audit_log(
             request.user,
             'privacy_request_completed',
             privacy_request,
-            {'request_type': privacy_request.request_type},
+            {
+                'request_type': privacy_request.request_type,
+                'action': result['action'],
+                'summary': result.get('summary', {}),
+            },
         )
-        return Response(self.get_serializer(privacy_request).data)
+        data = self.get_serializer(privacy_request).data
+        data['lgpd_action'] = result['action']
+        data['lgpd_summary'] = result.get('summary', {})
+        if 'export' in result:
+            data['export'] = result['export']
+        return Response(data)
 
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None, **kwargs):
@@ -227,7 +238,7 @@ class DeactivateOwnAccountView(APIView):
     def post(self, request, *args, **kwargs):
         if request.user.is_staff:
             return Response(
-                {'detail': 'Use a gestao de administradores para desativar contas administrativas.'},
+                {'detail': 'Use a gestão de administradores para desativar contas administrativas.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -271,7 +282,7 @@ class ManagerViewSet(viewsets.ModelViewSet):
         manager = self.get_object()
         if self.is_self_action(manager):
             return Response(
-                {'detail': 'Voce nao pode desativar seu proprio acesso.'},
+                {'detail': 'Você não pode desativar seu próprio acesso.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -285,7 +296,7 @@ class ManagerViewSet(viewsets.ModelViewSet):
         manager = self.get_object()
         if self.is_self_action(manager):
             return Response(
-                {'detail': 'Voce nao pode desativar seu proprio acesso.'},
+                {'detail': 'Você não pode desativar seu próprio acesso.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -311,7 +322,7 @@ class ManagerViewSet(viewsets.ModelViewSet):
         manager = self.get_object()
         if self.is_self_action(manager):
             return Response(
-                {'detail': 'Voce nao pode revogar seu proprio acesso.'},
+                {'detail': 'Você não pode revogar seu próprio acesso.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -403,8 +414,7 @@ class AnnouncementViewSet(NoDestroyModelViewSet):
         return queryset.filter(status=Announcement.STATUS_PUBLISHED)
 
     def perform_create(self, serializer):
-        files = self.get_attachment_files()
-        self.validate_attachments(files)
+        files = self.prepare_attachment_files()
         announcement = serializer.save(author=self.request.user)
         self.create_attachments(announcement, files)
         record_audit_log(self.request.user, 'announcement_created', announcement)
@@ -412,8 +422,7 @@ class AnnouncementViewSet(NoDestroyModelViewSet):
             self.push_dispatch_result = dispatch_published_announcement(announcement)
 
     def perform_update(self, serializer):
-        files = self.get_attachment_files()
-        self.validate_attachments(files)
+        files = self.prepare_attachment_files()
         was_published = serializer.instance.status == Announcement.STATUS_PUBLISHED
         announcement = serializer.save()
         self.create_attachments(announcement, files)
@@ -427,9 +436,11 @@ class AnnouncementViewSet(NoDestroyModelViewSet):
         files.extend(self.request.FILES.getlist('files'))
         return files
 
-    def validate_attachments(self, files):
-        for uploaded_file in files:
-            validate_attachment(uploaded_file)
+    def prepare_attachment_files(self):
+        return [
+            prepare_attachment(uploaded_file)
+            for uploaded_file in self.get_attachment_files()
+        ]
 
     def create_attachments(self, announcement, files):
         for uploaded_file in files:
@@ -480,7 +491,7 @@ class AnnouncementViewSet(NoDestroyModelViewSet):
         )
         return Response(
             {
-                'detail': 'Delivery dispatch processed.',
+                'detail': 'Disparo de notificações processado.',
                 'provider_configured': result['configured'],
                 'sent': result['sent'],
                 'failed': result['failed'],
@@ -538,24 +549,24 @@ class AnnouncementViewSet(NoDestroyModelViewSet):
             logs = logs.filter(device__token=device_token)
         else:
             return Response(
-                {'detail': 'Authentication, delivery_log_id or device_token is required.'},
+                {'detail': 'Autenticação, delivery_log_id ou device_token é obrigatório.'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
         log = logs.order_by('-created_at').first()
         if not log:
             return Response(
-                {'detail': 'Delivery log not found for this announcement.'},
+                {'detail': 'Log de entrega não encontrado para este comunicado.'},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         if not self.can_mark_log_viewed(request, log, device_token):
-            return Response({'detail': 'Not allowed.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'detail': 'Ação não permitida.'}, status=status.HTTP_403_FORBIDDEN)
 
         self.mark_log_viewed(log)
         return Response(
             {
-                'detail': 'Announcement marked as viewed.',
+                'detail': 'Comunicado marcado como visualizado.',
                 'delivery_log': DeliveryLogSerializer(log).data,
             }
         )
@@ -594,10 +605,11 @@ class AttachmentViewSet(NoDestroyModelViewSet):
     def perform_create(self, serializer):
         uploaded_file = self.request.FILES.get('file')
         if uploaded_file:
-            validate_attachment(uploaded_file)
+            prepared_file = prepare_attachment(uploaded_file)
             serializer.save(
-                original_name=uploaded_file.name,
-                file_type=attachment_type(uploaded_file),
+                file=prepared_file,
+                original_name=prepared_file.name,
+                file_type=attachment_type(prepared_file),
             )
         else:
             serializer.save()
@@ -627,7 +639,7 @@ class PushDeviceViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         token = request.data.get('token')
         if not token:
-            return Response({'detail': 'token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Token é obrigatório.'}, status=status.HTTP_400_BAD_REQUEST)
 
         defaults = {
             'platform': request.data.get('platform', PushDevice.PLATFORM_WEB),
@@ -660,7 +672,7 @@ class DeliveryLogViewSet(NoDestroyModelViewSet):
     def mark_viewed(self, request, pk=None, **kwargs):
         log = self.get_object()
         if not request.user.is_staff and log.recipient_user_id != request.user.id:
-            return Response({'detail': 'Not allowed.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'detail': 'Ação não permitida.'}, status=status.HTTP_403_FORBIDDEN)
         log.status = DeliveryLog.STATUS_VIEWED
         log.viewed_at = timezone.now()
         log.save(update_fields=['status', 'viewed_at'])

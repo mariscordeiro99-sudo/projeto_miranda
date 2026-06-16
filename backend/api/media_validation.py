@@ -1,10 +1,13 @@
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
 import tempfile
+from pathlib import Path
 
+from django.conf import settings
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from .models import Attachment
@@ -15,6 +18,7 @@ class VideoDurationValidationError(Exception):
 
 
 MAX_ATTACHMENT_SIZE = 60 * 1024 * 1024
+MAX_VIDEO_SOURCE_SIZE = 250 * 1024 * 1024
 MAX_VIDEO_DURATION_SECONDS = 60
 MAX_PROFILE_IMAGE_SIZE = 10 * 1024 * 1024
 ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = {
@@ -53,14 +57,20 @@ def attachment_type(uploaded_file):
 def validate_attachment(uploaded_file):
     content_type = getattr(uploaded_file, 'content_type', '') or ''
     if content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
-        raise DRFValidationError(f'Unsupported attachment type: {content_type or "unknown"}.')
-    if uploaded_file.size > MAX_ATTACHMENT_SIZE:
-        raise DRFValidationError('Attachment exceeds the 60MB limit.')
+        raise DRFValidationError(
+            f'Tipo de anexo não suportado: {content_type or "desconhecido"}.'
+        )
     if content_type.startswith('video/'):
+        if uploaded_file.size > MAX_VIDEO_SOURCE_SIZE:
+            raise DRFValidationError('O vídeo original excede o limite de 250MB.')
         try:
             validate_video_duration(uploaded_file, MAX_VIDEO_DURATION_SECONDS)
         except VideoDurationValidationError as error:
             raise DRFValidationError(str(error))
+        return
+
+    if uploaded_file.size > MAX_ATTACHMENT_SIZE:
+        raise DRFValidationError('O anexo excede o limite de 60MB.')
 
 
 def validate_profile_picture(uploaded_file):
@@ -72,19 +82,19 @@ def validate_profile_picture(uploaded_file):
         raise DRFValidationError('A foto de perfil deve ser JPG, PNG ou WEBP.')
 
     if uploaded_file.size > MAX_PROFILE_IMAGE_SIZE:
-        raise DRFValidationError('A foto de perfil deve ter no maximo 10MB.')
+        raise DRFValidationError('A foto de perfil deve ter no máximo 10MB.')
 
 
 def validate_video_duration(uploaded_file, max_seconds):
     duration = get_video_duration(uploaded_file)
     if duration is None:
         raise VideoDurationValidationError(
-            'Nao foi possivel validar a duracao do video. Envie um arquivo MP4/MOV valido.'
+            'Não foi possível validar a duração do vídeo. Envie um arquivo MP4/MOV válido.'
         )
 
     if duration > max_seconds:
         raise VideoDurationValidationError(
-            f'O video deve ter no maximo {max_seconds} segundos.'
+            f'O vídeo deve ter no máximo {max_seconds} segundos.'
         )
 
 
@@ -93,7 +103,11 @@ def get_video_duration(uploaded_file):
     if duration is not None:
         return duration
 
-    return _get_mp4_duration(_read_uploaded_file(uploaded_file))
+    duration = _get_mp4_duration(_read_uploaded_file(uploaded_file))
+    if duration is not None:
+        return duration
+
+    return _get_duration_with_ffmpeg(uploaded_file)
 
 
 def _read_uploaded_file(uploaded_file):
@@ -166,6 +180,82 @@ def _run_ffprobe(ffprobe_path, file_path):
         return float(duration)
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return None
+
+
+def _get_duration_with_ffmpeg(uploaded_file):
+    ffmpeg_path = get_ffmpeg_executable()
+    if not ffmpeg_path:
+        return None
+
+    temp_path = None
+    try:
+        temporary_file_path = getattr(uploaded_file, 'temporary_file_path', None)
+        if callable(temporary_file_path):
+            return _run_ffmpeg_probe(ffmpeg_path, temporary_file_path())
+
+        suffix = os.path.splitext(getattr(uploaded_file, 'name', 'upload'))[1]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_file.write(_read_uploaded_file(uploaded_file))
+            temp_path = temp_file.name
+
+        return _run_ffmpeg_probe(ffmpeg_path, temp_path)
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+
+
+def _run_ffmpeg_probe(ffmpeg_path, file_path):
+    try:
+        result = subprocess.run(
+            [
+                ffmpeg_path,
+                '-hide_banner',
+                '-i',
+                file_path,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+    match = re.search(
+        r'Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)',
+        result.stderr or '',
+    )
+    if not match:
+        return None
+
+    hours, minutes, seconds = match.groups()
+    return (int(hours) * 3600) + (int(minutes) * 60) + float(seconds)
+
+
+def get_ffmpeg_executable():
+    configured_path = getattr(settings, 'FFMPEG_BINARY', '').strip()
+    if configured_path:
+        resolved_path = shutil.which(configured_path)
+        if resolved_path:
+            return resolved_path
+        if Path(configured_path).is_file():
+            return configured_path
+
+    system_path = shutil.which('ffmpeg')
+    if system_path:
+        return system_path
+
+    try:
+        import imageio_ffmpeg
+
+        bundled_path = imageio_ffmpeg.get_ffmpeg_exe()
+    except (ImportError, RuntimeError, OSError):
+        return None
+
+    return bundled_path if bundled_path and Path(bundled_path).is_file() else None
 
 
 def _get_mp4_duration(data):

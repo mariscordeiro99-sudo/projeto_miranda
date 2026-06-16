@@ -16,8 +16,7 @@ echo "Database Port: $DB_PORT"
 echo ""
 
 echo "=== Installing dependencies ==="
-pip install --upgrade pip
-pip install -r requirements.txt
+python -m pip install --disable-pip-version-check --no-input -r requirements.txt
 
 echo ""
 echo "=== Running migrations ==="

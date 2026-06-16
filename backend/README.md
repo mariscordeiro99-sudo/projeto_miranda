@@ -77,7 +77,40 @@ Para as rotinas periodicas de retry, limpeza de logs antigos e marcacao de entre
 celery -A core beat --loglevel=info
 ```
 
-## 7. Gestao de administradores
+## 7. Compressao automatica de videos
+
+Todo video enviado como anexo passa por validacao e compressao antes de ser salvo.
+O backend:
+
+- aceita MP4, MOV e WebM;
+- bloqueia videos com mais de 60 segundos;
+- aceita arquivo original de ate 250 MB;
+- converte o resultado para MP4 com video H.264 e audio AAC;
+- limita a maior dimensao a 1280 pixels;
+- usa `faststart` para iniciar a reproducao antes do download completo;
+- rejeita o upload sem criar registros parciais se a conversao falhar;
+- salva somente o arquivo otimizado no Cloudinary.
+
+O pacote `imageio-ffmpeg` fornece o executavel FFmpeg no Windows e no Linux.
+Os parametros podem ser ajustados por ambiente:
+
+```env
+VIDEO_COMPRESSION_ENABLED=true
+VIDEO_COMPRESSION_MAX_DIMENSION=1280
+VIDEO_COMPRESSION_CRF=28
+VIDEO_COMPRESSION_PRESET=medium
+VIDEO_COMPRESSION_AUDIO_BITRATE=96k
+VIDEO_COMPRESSION_TIMEOUT_SECONDS=180
+MAX_COMPRESSED_VIDEO_SIZE_MB=60
+```
+
+Quanto maior o CRF, menor o arquivo e menor a qualidade. Para o MVP, `28`
+prioriza baixo consumo de dados mantendo qualidade adequada para comunicados.
+
+O endpoint administrativo `/health/detailed/` informa o estado do componente
+`video_processing`.
+
+## 8. Gestao de administradores
 Administradores autenticados podem gerenciar gestores autorizados pela API:
 
 ```http
@@ -112,7 +145,7 @@ MANAGER_TOKEN_ROTATE_ON_LOGIN=true
 
 Gestores recebem token novo a cada login. Tokens expirados sao recusados e revogados automaticamente. Reset de senha tambem revoga tokens existentes.
 
-## 8. LGPD e auditoria
+## 9. LGPD e auditoria
 Administradores podem consultar trilhas de auditoria pela API:
 
 ```http
@@ -150,7 +183,7 @@ A politica operacional LGPD esta documentada em:
 backend/docs/LGPD_POLICY.md
 ```
 
-## 9. Segmentacao de envio
+## 10. Segmentacao de envio
 Administradores podem criar segmentos para enviar comunicados a grupos especificos:
 
 ```http
@@ -172,7 +205,7 @@ Um segmento pode conter usuarios e/ou dispositivos push. Ao criar ou editar um c
 
 Se `segments` estiver vazio ou ausente, o comunicado e enviado para todos os dispositivos ativos.
 
-## 10. Backup e restauracao
+## 11. Backup e restauracao
 O procedimento operacional de backup e restore esta documentado em:
 
 ```text
@@ -187,7 +220,7 @@ Politica minima do MVP:
 - arquivos mantidos no Cloudinary, com cuidado para nao apagar recursos manualmente;
 - variaveis do Render documentadas fora do Git, sem segredos no repositorio.
 
-## 11. Guia final de producao
+## 12. Guia final de producao
 O guia consolidado de deploy e operacao em producao esta em:
 
 ```text

@@ -108,6 +108,35 @@
     gap: 12px;
   }
 
+  .miranda-report-group {
+    margin-top: 18px;
+  }
+
+  .miranda-report-group-title {
+    align-items: center;
+    color: var(--text);
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin: 0 0 10px;
+  }
+
+  .miranda-report-group-title strong {
+    font-size: 1.05rem;
+  }
+
+  .miranda-report-group-title span {
+    background: var(--surface-high);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--primary);
+    font-family: monospace;
+    font-size: 0.78rem;
+    font-weight: 900;
+    padding: 6px 10px;
+    text-transform: uppercase;
+  }
+
   .miranda-report-row {
     align-items: center;
     background: var(--surface);
@@ -203,6 +232,30 @@
       <strong>{{ count }}</strong>
     </section>
 
+    {% if groups %}
+      {% for group in groups %}
+      <section class="miranda-report-group">
+        <h2 class="miranda-report-group-title">
+          <strong>{{ group.title }}</strong>
+          <span>{{ group.count }}</span>
+        </h2>
+        <div class="miranda-report-list{% if danger %} danger{% endif %}">
+          {% for row in group.rows %}
+          <a class="miranda-report-row" href="{{ row.url }}">
+            <span>
+              <strong class="miranda-report-primary">{{ row.primary }}</strong>
+              <span class="miranda-report-secondary">{{ row.secondary }}</span>
+            </span>
+            <span class="miranda-report-meta">{{ row.meta }}</span>
+            <span class="miranda-report-status">{{ row.status }}</span>
+          </a>
+          {% empty %}
+          <div class="miranda-report-empty">{{ group.empty_message }}</div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    {% else %}
     <section class="miranda-report-list{% if danger %} danger{% endif %}">
       {% for row in rows %}
       <a class="miranda-report-row" href="{{ row.url }}">
@@ -217,6 +270,7 @@
       <div class="miranda-report-empty">{{ empty_message }}</div>
       {% endfor %}
     </section>
+    {% endif %}
   </div>
 </main>
 {% endblock %}

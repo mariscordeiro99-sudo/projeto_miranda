@@ -9,6 +9,8 @@ from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .backup import build_backup_operational_status
+from .media_validation import get_ffmpeg_executable
 from .services import PushNotificationService
 
 
@@ -59,6 +61,8 @@ class DetailedHealthCheckView(APIView):
             'cache': check_cache(),
             'firebase': check_firebase(),
             'cloudinary': check_cloudinary(),
+            'video_processing': check_video_processing(),
+            'backup_policy': build_backup_operational_status(),
         }
         overall_status = summarize_status(components)
         response_status = (
@@ -95,7 +99,7 @@ def check_cache():
     try:
         cache.set(key, value, timeout=30)
         if cache.get(key) != value:
-            return {'status': 'degraded', 'detail': 'Cache write/read mismatch.'}
+            return {'status': 'degraded', 'detail': 'Falha de escrita/leitura no cache.'}
         return {'status': 'healthy'}
     except Exception as error:
         return {'status': 'degraded', 'detail': str(error)}
@@ -107,7 +111,7 @@ def check_firebase():
         return {'status': 'healthy'}
     return {
         'status': 'degraded',
-        'detail': 'Firebase push is disabled or credentials are incomplete.',
+        'detail': 'Firebase push está desativado ou com credenciais incompletas.',
     }
 
 
@@ -124,8 +128,25 @@ def check_cloudinary():
     if missing:
         return {
             'status': 'degraded',
-            'detail': f'Missing configuration: {", ".join(missing)}.',
+            'detail': f'Configuração ausente: {", ".join(missing)}.',
         }
+    return {'status': 'healthy'}
+
+
+def check_video_processing():
+    if not getattr(settings, 'VIDEO_COMPRESSION_ENABLED', True):
+        return {
+            'status': 'degraded',
+            'detail': 'Compressão automática de vídeo está desativada.',
+        }
+
+    ffmpeg_path = get_ffmpeg_executable()
+    if not ffmpeg_path:
+        return {
+            'status': 'unhealthy',
+            'detail': 'Executável do FFmpeg não foi encontrado.',
+        }
+
     return {'status': 'healthy'}
 
 

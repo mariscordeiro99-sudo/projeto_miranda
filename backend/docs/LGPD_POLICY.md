@@ -129,21 +129,41 @@ POST /api/privacy-requests/{id}/complete/
 POST /api/privacy-requests/{id}/reject/
 ```
 
+Ao concluir uma solicitacao pendente, o backend executa a acao tecnica conforme
+o tipo do pedido:
+
+- `export`: conclui a solicitacao e retorna no corpo da resposta um pacote
+  JSON com dados cadastrais, perfil, segmentos, dispositivos, logs de entrega,
+  solicitacoes LGPD, auditoria relacionada e comunicados de autoria do usuario.
+  Chaves de autenticacao nao sao exportadas; apenas a contagem de tokens ativos.
+- `erasure`: anonimiza o usuario, limpa dados de contato, remove tokens de
+  autenticacao, desativa/desvincula dispositivos push, remove segmentos,
+  anonimiza solicitacoes LGPD relacionadas e desvincula logs de entrega do
+  titular. Logs institucionais permanecem sem dados pessoais diretos.
+- `deactivation`: desativa a conta, remove tokens de autenticacao e desativa
+  dispositivos push, preservando os dados cadastrais para retencao operacional.
+
+Solicitacoes ja resolvidas nao podem ser concluidas novamente. Contas
+administrativas exigem tratamento LGPD manual para evitar perda de acesso de
+gestao.
+
 ## Exclusao e anonimizacao
 
-Ao receber pedido de exclusao, a equipe deve avaliar:
+Ao receber pedido de exclusao, a equipe ainda deve avaliar previamente:
 
 1. se existe obrigacao legal/institucional de manter algum registro;
 2. quais dados podem ser apagados;
 3. quais dados devem ser anonimizados;
 4. quais logs devem permanecer por auditoria.
 
-Recomendacao:
+Ao confirmar a conclusao da solicitacao, o backend aplica:
 
-- desativar a conta do usuario;
-- apagar tokens de push ativos;
-- remover ou anonimizar dados de contato quando aplicavel;
-- manter logs de auditoria sem conteudo excessivo;
+- desativacao da conta do usuario;
+- remocao de tokens de autenticacao ativos;
+- remocao de telefone e foto de perfil;
+- anonimizacao de nome, email e senha;
+- desativacao e desvinculo dos dispositivos push;
+- desvinculo de logs de entrega do usuario;
 - registrar conclusao no `PrivacyRequest`.
 
 ## Desativacao de conta

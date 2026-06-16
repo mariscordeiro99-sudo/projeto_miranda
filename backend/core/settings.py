@@ -99,6 +99,14 @@ SESSION_COOKIE_AGE = int(os.getenv('SESSION_COOKIE_AGE', '1209600' if DEBUG else
 SESSION_EXPIRE_AT_BROWSER_CLOSE = env_bool('SESSION_EXPIRE_AT_BROWSER_CLOSE', not DEBUG)
 MANAGER_TOKEN_TTL_SECONDS = int(os.getenv('MANAGER_TOKEN_TTL_SECONDS', '28800'))
 MANAGER_TOKEN_ROTATE_ON_LOGIN = env_bool('MANAGER_TOKEN_ROTATE_ON_LOGIN', True)
+DB_SSL_REQUIRED = env_bool('DB_SSL_REQUIRED', True)
+BACKUP_PROVIDER = os.getenv('BACKUP_PROVIDER', 'aiven')
+BACKUP_FREQUENCY_HOURS = int(os.getenv('BACKUP_FREQUENCY_HOURS', '24'))
+BACKUP_MIN_RETENTION_DAYS = int(os.getenv('BACKUP_MIN_RETENTION_DAYS', '7' if DEBUG else '30'))
+BACKUP_RETENTION_DAYS = int(os.getenv('BACKUP_RETENTION_DAYS', str(BACKUP_MIN_RETENTION_DAYS)))
+BACKUP_RESTORE_TEST_INTERVAL_DAYS = int(os.getenv('BACKUP_RESTORE_TEST_INTERVAL_DAYS', '30'))
+BACKUP_LAST_RESTORE_TEST_AT = os.getenv('BACKUP_LAST_RESTORE_TEST_AT', '')
+BACKUP_EVIDENCE_URL = os.getenv('BACKUP_EVIDENCE_URL', '')
 
 if not DEBUG:
     required_secure_settings = {
@@ -367,7 +375,7 @@ if 'mysql' in DATABASES['default'].get('ENGINE', ''):
     )
     DATABASES['default']['OPTIONS'].setdefault('connect_timeout', 10)
 
-    if env_bool('DB_SSL_REQUIRED', True):
+    if DB_SSL_REQUIRED:
         ssl_options = {}
         ca_path = db_ca_cert_path()
         if ca_path:
@@ -473,6 +481,24 @@ PUSH_DISPATCH_ASYNC = env_bool(
     bool(os.getenv('CELERY_BROKER_URL') or os.getenv('REDIS_URL')),
 )
 
+VIDEO_COMPRESSION_ENABLED = env_bool('VIDEO_COMPRESSION_ENABLED', True)
+VIDEO_COMPRESSION_MAX_DIMENSION = int(
+    os.getenv('VIDEO_COMPRESSION_MAX_DIMENSION', '1280')
+)
+VIDEO_COMPRESSION_CRF = int(os.getenv('VIDEO_COMPRESSION_CRF', '28'))
+VIDEO_COMPRESSION_PRESET = os.getenv('VIDEO_COMPRESSION_PRESET', 'medium')
+VIDEO_COMPRESSION_AUDIO_BITRATE = os.getenv(
+    'VIDEO_COMPRESSION_AUDIO_BITRATE',
+    '96k',
+)
+VIDEO_COMPRESSION_TIMEOUT_SECONDS = int(
+    os.getenv('VIDEO_COMPRESSION_TIMEOUT_SECONDS', '180')
+)
+MAX_COMPRESSED_VIDEO_SIZE = int(
+    os.getenv('MAX_COMPRESSED_VIDEO_SIZE_MB', '60')
+) * 1024 * 1024
+FFMPEG_BINARY = os.getenv('FFMPEG_BINARY', '')
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REDIS_URL = os.getenv('REDIS_URL', '')
@@ -531,6 +557,10 @@ CELERY_BEAT_SCHEDULE = {
     'deactivate-invalid-push-devices': {
         'task': 'api.tasks.deactivate_invalid_push_devices',
         'schedule': 60 * 60 * 6,
+    },
+    'backup-operational-evidence-daily': {
+        'task': 'api.tasks.record_backup_operational_evidence',
+        'schedule': 60 * 60 * 24,
     },
 }
 

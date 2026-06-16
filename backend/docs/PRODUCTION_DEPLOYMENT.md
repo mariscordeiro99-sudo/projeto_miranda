@@ -81,6 +81,29 @@ Alternativa aceita:
 DATABASE_URL=mysql://USER:PASSWORD@HOST:PORT/DB?ssl-mode=REQUIRED
 ```
 
+### Backup e prova operacional
+
+```text
+BACKUP_PROVIDER=aiven
+BACKUP_FREQUENCY_HOURS=24
+BACKUP_MIN_RETENTION_DAYS=30
+BACKUP_RETENTION_DAYS=30
+BACKUP_RESTORE_TEST_INTERVAL_DAYS=30
+BACKUP_LAST_RESTORE_TEST_AT=YYYY-MM-DD
+BACKUP_EVIDENCE_URL=https://...
+```
+
+Depois de conferir o backup automatico no painel da Aiven ou concluir um teste
+de restore em ambiente separado, registre a evidencia:
+
+```bash
+python manage.py verify_backup_operability --record --json
+```
+
+O health check detalhado expoe `components.backup_policy`. A task
+`api.tasks.record_backup_operational_evidence` roda diariamente pelo Celery beat
+e registra `backup_operational_evidence` em `AuditLog`.
+
 ### CORS/CSRF e frontend
 
 ```text
@@ -98,6 +121,22 @@ CLOUDINARY_API_KEY
 CLOUDINARY_API_SECRET
 CLOUDINARY_MEDIA_FOLDER=nexa
 ```
+
+### Compressao de videos
+
+```text
+VIDEO_COMPRESSION_ENABLED=true
+VIDEO_COMPRESSION_MAX_DIMENSION=1280
+VIDEO_COMPRESSION_CRF=28
+VIDEO_COMPRESSION_PRESET=medium
+VIDEO_COMPRESSION_AUDIO_BITRATE=96k
+VIDEO_COMPRESSION_TIMEOUT_SECONDS=180
+MAX_COMPRESSED_VIDEO_SIZE_MB=60
+```
+
+O `imageio-ffmpeg` instalado por `requirements.txt` fornece o executavel usado
+para converter MP4, MOV e WebM em MP4/H.264/AAC. O upload falha se o FFmpeg nao
+estiver disponivel ou se o arquivo final continuar acima do limite.
 
 ### Firebase push notification
 
@@ -157,6 +196,7 @@ Se essas variaveis existirem, o build executa `python manage.py upsert_admin`.
 - `CORS_ALLOW_ALL_ORIGINS=false`.
 - Banco Aiven aceita conexao do Render com SSL.
 - Cloudinary esta com credenciais validas.
+- `/health/detailed/` informa `video_processing.status=healthy`.
 - Firebase esta com service account valida.
 - `FIREBASE_ENABLED=true` somente quando as credenciais estiverem certas.
 - Redis esta criado e `REDIS_URL` aparece nos servicos web, worker e beat.
@@ -164,6 +204,9 @@ Se essas variaveis existirem, o build executa `python manage.py upsert_admin`.
 - `SECRET_KEY` e credenciais de banco sao iguais entre web, worker e beat.
 - SMTP foi configurado se reset de senha por e-mail for necessario.
 - Backup automatico do Aiven foi conferido.
+- `BACKUP_LAST_RESTORE_TEST_AT` e `BACKUP_EVIDENCE_URL` foram atualizados.
+- `python manage.py verify_backup_operability --record --json` registrou evidencia.
+- `/health/detailed/` mostra `backup_policy` sem pendencias criticas.
 
 ## Comandos uteis em producao
 
@@ -237,12 +280,13 @@ python scripts/test_db_connection.py
 10. Confirmar que logs de entrega foram criados.
 11. Confirmar que `/api/audit-logs/` registrou a acao.
 12. Testar upload de PDF/imagem em comunicado.
-13. Confirmar URL do anexo no Cloudinary.
-14. Registrar um token em `/api/push-devices/`.
-15. Publicar comunicado e verificar `push_dispatch.queued=true` quando `PUSH_DISPATCH_ASYNC=true`.
-16. Conferir logs do `projeto-miranda-celery-worker` e confirmar envio ou falha registrada.
-17. Se houver token real, confirmar `sent > 0` e recebimento no app/PWA.
-18. Testar reset de senha se SMTP estiver configurado.
+13. Enviar um video MOV ou WebM de ate 60 segundos e confirmar que o anexo salvo e MP4.
+14. Confirmar URL do anexo no Cloudinary.
+15. Registrar um token em `/api/push-devices/`.
+16. Publicar comunicado e verificar `push_dispatch.queued=true` quando `PUSH_DISPATCH_ASYNC=true`.
+17. Conferir logs do `projeto-miranda-celery-worker` e confirmar envio ou falha registrada.
+18. Se houver token real, confirmar `sent > 0` e recebimento no app/PWA.
+19. Testar reset de senha se SMTP estiver configurado.
 
 ## Teste rapido de API
 
@@ -344,6 +388,7 @@ Resposta esperada quando o envio assincrono esta ativo:
 - Revisar logs do Render apos cada deploy.
 - Conferir backup Aiven semanalmente.
 - Testar restore mensalmente conforme `backend/docs/BACKUP_RESTORE.md`.
+- Revisar evidencias `backup_operational_evidence` em `/api/audit-logs/`.
 - Revisar usuarios administradores periodicamente em `/api/managers/`.
 - Gestores recebem token rotacionado no login e expirado conforme `MANAGER_TOKEN_TTL_SECONDS`.
 - Revisar solicitacoes LGPD em `/api/privacy-requests/`.

@@ -6,26 +6,49 @@ from django.urls import reverse
 from .models import Announcement, DeliveryLog, PushDevice
 
 
+def user_report_row(user, role_label):
+    return {
+        'url': reverse('admin:auth_user_change', args=[user.id]),
+        'primary': user.get_full_name() or user.username,
+        'secondary': user.email or 'Sem e-mail',
+        'meta': role_label,
+        'status': 'Ativo',
+    }
+
+
 @staff_member_required
 def active_users_report(request):
     users = User.objects.filter(is_active=True).order_by('username')
-    rows = [
+    citizens = users.filter(is_staff=False, is_superuser=False)
+    administrators = users.filter(is_staff=True)
+    groups = [
         {
-            'url': reverse('admin:auth_user_change', args=[user.id]),
-            'primary': user.get_full_name() or user.username,
-            'secondary': user.email or 'Sem e-mail',
-            'meta': 'Staff' if user.is_staff else 'Cidadão',
-            'status': 'Ativo',
-        }
-        for user in users
+            'title': 'Usu\u00e1rios cidad\u00e3os ativos',
+            'count': citizens.count(),
+            'rows': [
+                user_report_row(user, 'Cidad\u00e3o')
+                for user in citizens
+            ],
+            'empty_message': 'Nenhum cidad\u00e3o ativo encontrado.',
+        },
+        {
+            'title': 'Administradores ativos',
+            'count': administrators.count(),
+            'rows': [
+                user_report_row(user, 'Administrador')
+                for user in administrators
+            ],
+            'empty_message': 'Nenhum administrador ativo encontrado.',
+        },
     ]
     return render_report(
         request,
-        title='Usuários ativos',
-        eyebrow='Relatório de acesso',
+        title='Usu\u00e1rios ativos',
+        eyebrow='Relat\u00f3rio de acesso',
         count=users.count(),
-        rows=rows,
-        empty_message='Nenhum usuário ativo encontrado.',
+        rows=[],
+        groups=groups,
+        empty_message='Nenhum usu\u00e1rio ativo encontrado.',
     )
 
 
@@ -78,7 +101,7 @@ def active_devices_report(request):
     return render_report(
         request,
         title='Dispositivos ativos',
-        eyebrow='Push notification',
+        eyebrow='Notificações push',
         count=devices.count(),
         rows=rows,
         empty_message='Nenhum dispositivo ativo encontrado.',
@@ -114,7 +137,7 @@ def failed_deliveries_report(request):
     )
 
 
-def render_report(request, title, eyebrow, count, rows, empty_message, danger=False):
+def render_report(request, title, eyebrow, count, rows, empty_message, danger=False, groups=None):
     return render(
         request,
         'admin/reports/detail.html',
@@ -124,6 +147,7 @@ def render_report(request, title, eyebrow, count, rows, empty_message, danger=Fa
             'eyebrow': eyebrow,
             'count': count,
             'rows': rows,
+            'groups': groups or [],
             'empty_message': empty_message,
             'danger': danger,
             'dashboard_url': reverse('admin:index'),

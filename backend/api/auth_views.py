@@ -65,7 +65,7 @@ class RegisterView(APIView):
 
         if not username or not email or not password:
             return Response(
-                {'detail': 'username, email and password are required.'},
+                {'detail': 'Usuário, e-mail e senha são obrigatórios.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -92,13 +92,13 @@ class RegisterView(APIView):
 
         if any(user['username'] == username for user in existing_users):
             return Response(
-                {'detail': 'username already exists.'},
+                {'detail': 'Este usuário já existe.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if any(user['email'] == email for user in existing_users):
             return Response(
-                {'detail': 'email already exists.'},
+                {'detail': 'Este e-mail já existe.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -130,13 +130,13 @@ class RegisterView(APIView):
                 )
         except cloudinary.exceptions.Error:
             return Response(
-                {'detail': 'Nao foi possivel enviar a foto de perfil. Tente novamente.'},
+                {'detail': 'Não foi possível enviar a foto de perfil. Tente novamente.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
         return Response(
             {
-                'message': 'User registered successfully.',
+                'message': 'Usuário cadastrado com sucesso.',
                 'user': {
                     'username': user.username,
                     'email': user.email,
@@ -178,7 +178,7 @@ class LoginView(APIView):
 
         if not login_value or not password:
             return Response(
-                {'detail': 'username and password are required.'},
+                {'detail': 'Usuário e senha são obrigatórios.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -196,7 +196,7 @@ class LoginView(APIView):
 
         if not password_is_valid:
             return Response(
-                {'detail': 'Invalid credentials.'},
+                {'detail': 'Credenciais inválidas.'},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
@@ -244,7 +244,7 @@ class PasswordResetRequestView(APIView):
 
         if not identifier:
             return Response(
-                {'detail': 'email is required.'},
+                {'detail': 'E-mail ou usuário é obrigatório.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -256,11 +256,11 @@ class PasswordResetRequestView(APIView):
             reset_url = f'{frontend_url}/reset-password?uid={uid}&token={token}'
 
             send_mail(
-                subject='Redefinicao de senha - Projeto Miranda',
+                subject='Redefinição de senha - Projeto Miranda',
                 message=(
-                    'Recebemos uma solicitacao para redefinir sua senha.\n\n'
+                    'Recebemos uma solicitação para redefinir sua senha.\n\n'
                     f'Acesse este link para criar uma nova senha:\n{reset_url}\n\n'
-                    'Se voce nao solicitou isso, ignore este e-mail.'
+                    'Se você não solicitou isso, ignore este e-mail.'
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
@@ -268,7 +268,7 @@ class PasswordResetRequestView(APIView):
             )
 
         return Response(
-            {'detail': 'If the account exists, a password reset email was sent.'},
+            {'detail': 'Se a conta existir, um e-mail de redefinição de senha foi enviado.'},
             status=status.HTTP_200_OK,
         )
 
@@ -301,7 +301,7 @@ class PasswordResetConfirmView(APIView):
 
         if not uid or not token or not new_password:
             return Response(
-                {'detail': 'uid, token and new_password are required.'},
+                {'detail': 'UID, token e nova senha são obrigatórios.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -313,7 +313,7 @@ class PasswordResetConfirmView(APIView):
 
         if user is None or not default_token_generator.check_token(user, token):
             return Response(
-                {'detail': 'Invalid or expired password reset token.'},
+                {'detail': 'Token de redefinição de senha inválido ou expirado.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -330,6 +330,6 @@ class PasswordResetConfirmView(APIView):
         Token.objects.filter(user=user).delete()
 
         return Response(
-            {'detail': 'Password has been reset successfully.'},
+            {'detail': 'Senha redefinida com sucesso.'},
             status=status.HTTP_200_OK,
         )

@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db.models import Count
 from django.utils import timezone
 
+from .backup import record_backup_operational_evidence as record_backup_evidence
 from .delivery import create_pending_delivery_logs
 from .models import Announcement, DeliveryLog, PushDevice
 from .services import PushNotificationService, mark_failed_delivery
@@ -63,7 +64,7 @@ def mark_stale_deliveries_as_failed(hours=24):
     )
     total = stale_logs.count()
     for log in stale_logs.iterator():
-        mark_failed_delivery(log, 'Delivery remained pending past the allowed window.')
+        mark_failed_delivery(log, 'Entrega permaneceu pendente além do prazo permitido.')
     return {'failed': total}
 
 
@@ -86,6 +87,11 @@ def deactivate_invalid_push_devices():
         updated_at=timezone.now(),
     )
     return {'deactivated': updated}
+
+
+@shared_task
+def record_backup_operational_evidence():
+    return record_backup_evidence()
 
 
 @shared_task
