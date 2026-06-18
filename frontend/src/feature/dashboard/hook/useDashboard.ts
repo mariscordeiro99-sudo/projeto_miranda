@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../../common/services/api';
 import type { DashboardMetrics } from '../types/dashboardMetrics';
-import type {ApiError} from '../types/apiError';
+import type {ApiError} from '../../../common/types/apiError';
 
 export const useDashboard = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
