@@ -55,6 +55,46 @@ class NoDestroyModelViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
 
 
+def prefixed_q(prefix, **kwargs):
+    return Q(**{f'{prefix}{field}': value for field, value in kwargs.items()})
+
+
+def request_device_token(request):
+    token = request.query_params.get('device_token') or request.query_params.get('token')
+    if not token and request.method in {'POST', 'PUT', 'PATCH'}:
+        token = request.data.get('device_token') or request.data.get('token')
+    return str(token).strip() if token else ''
+
+
+def public_segment_visibility_filter(request, prefix=''):
+    visibility_filter = prefixed_q(prefix, segments__isnull=True)
+    user = getattr(request, 'user', None)
+
+    if user and user.is_authenticated:
+        visibility_filter |= prefixed_q(
+            prefix,
+            segments__is_active=True,
+            segments__users=user,
+        )
+        visibility_filter |= prefixed_q(
+            prefix,
+            segments__is_active=True,
+            segments__push_devices__user=user,
+            segments__push_devices__is_active=True,
+        )
+
+    device_token = request_device_token(request)
+    if device_token:
+        visibility_filter |= prefixed_q(
+            prefix,
+            segments__is_active=True,
+            segments__push_devices__token=device_token,
+            segments__push_devices__is_active=True,
+        )
+
+    return visibility_filter
+
+
 class HelloView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -411,7 +451,12 @@ class AnnouncementViewSet(NoDestroyModelViewSet):
         )
         if self.request.user.is_authenticated and self.request.user.is_staff:
             return queryset
-        return queryset.filter(status=Announcement.STATUS_PUBLISHED)
+        return (
+            queryset
+            .filter(status=Announcement.STATUS_PUBLISHED)
+            .filter(public_segment_visibility_filter(self.request))
+            .distinct()
+        )
 
     def perform_create(self, serializer):
         files = self.prepare_attachment_files()
@@ -600,7 +645,12 @@ class AttachmentViewSet(NoDestroyModelViewSet):
         queryset = Attachment.objects.select_related('announcement').all()
         if self.request.user.is_authenticated and self.request.user.is_staff:
             return queryset
-        return queryset.filter(announcement__status=Announcement.STATUS_PUBLISHED)
+        return (
+            queryset
+            .filter(announcement__status=Announcement.STATUS_PUBLISHED)
+            .filter(public_segment_visibility_filter(self.request, prefix='announcement__'))
+            .distinct()
+        )
 
     def perform_create(self, serializer):
         uploaded_file = self.request.FILES.get('file')

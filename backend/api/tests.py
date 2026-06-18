@@ -1136,6 +1136,121 @@ class PublicDataExposureTests(APITestCase):
         self.assertNotIn('email', response.data['author'])
         self.assertNotIn('is_staff', response.data['author'])
 
+    def test_segmented_announcement_is_visible_only_to_target_citizen(self):
+        citizen_a = User.objects.create_user(
+            username='cidadao_publico_a',
+            email='cidadao_publico_a@example.com',
+            password='SenhaForte123',
+        )
+        citizen_b = User.objects.create_user(
+            username='cidadao_publico_b',
+            email='cidadao_publico_b@example.com',
+            password='SenhaForte123',
+        )
+        segment = Segment.objects.create(
+            name='Publico Centro',
+            slug='publico-centro',
+            description='Cidadaos do centro.',
+        )
+        segment.users.add(citizen_a)
+        segmented = Announcement.objects.create(
+            author=self.staff_user,
+            title='Segmentado Centro',
+            content='Comunicado apenas para o centro.',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+        segmented.segments.add(segment)
+
+        anonymous_response = self.client.get('/api/announcements/')
+        anonymous_ids = {item['id'] for item in anonymous_response.data['results']}
+        self.assertIn(self.published.id, anonymous_ids)
+        self.assertNotIn(segmented.id, anonymous_ids)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {Token.objects.create(user=citizen_a).key}')
+        target_response = self.client.get('/api/announcements/')
+        target_ids = {item['id'] for item in target_response.data['results']}
+        self.assertIn(self.published.id, target_ids)
+        self.assertIn(segmented.id, target_ids)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {Token.objects.create(user=citizen_b).key}')
+        other_response = self.client.get('/api/announcements/')
+        other_ids = {item['id'] for item in other_response.data['results']}
+        self.assertIn(self.published.id, other_ids)
+        self.assertNotIn(segmented.id, other_ids)
+
+    def test_segmented_announcement_detail_requires_target_user_or_device(self):
+        citizen = User.objects.create_user(
+            username='cidadao_detalhe',
+            email='cidadao_detalhe@example.com',
+            password='SenhaForte123',
+        )
+        device = PushDevice.objects.create(
+            token='public-detail-device',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        segment = Segment.objects.create(
+            name='Publico Detalhe',
+            slug='publico-detalhe',
+        )
+        segment.users.add(citizen)
+        segment.push_devices.add(device)
+        segmented = Announcement.objects.create(
+            author=self.staff_user,
+            title='Detalhe segmentado',
+            content='Visivel por usuario ou dispositivo.',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+        segmented.segments.add(segment)
+
+        anonymous_response = self.client.get(f'/api/announcements/{segmented.id}/')
+        self.assertEqual(anonymous_response.status_code, status.HTTP_404_NOT_FOUND)
+
+        device_response = self.client.get(
+            f'/api/announcements/{segmented.id}/?device_token={device.token}'
+        )
+        self.assertEqual(device_response.status_code, status.HTTP_200_OK)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {Token.objects.create(user=citizen).key}')
+        user_response = self.client.get(f'/api/announcements/{segmented.id}/')
+        self.assertEqual(user_response.status_code, status.HTTP_200_OK)
+
+    def test_public_attachment_list_respects_announcement_segments(self):
+        device = PushDevice.objects.create(
+            token='attachment-segment-device',
+            platform=PushDevice.PLATFORM_WEB,
+            is_active=True,
+        )
+        segment = Segment.objects.create(
+            name='Anexos Centro',
+            slug='anexos-centro',
+        )
+        segment.push_devices.add(device)
+        segmented = Announcement.objects.create(
+            author=self.staff_user,
+            title='Anexo segmentado',
+            content='Arquivo restrito ao segmento.',
+            status=Announcement.STATUS_PUBLISHED,
+        )
+        segmented.segments.add(segment)
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            public_attachment = self.create_attachment(self.published, 'publico-geral.pdf')
+            segmented_attachment = self.create_attachment(segmented, 'publico-segmentado.pdf')
+
+            anonymous_response = self.client.get('/api/attachments/')
+            device_response = self.client.get(
+                f'/api/attachments/?device_token={device.token}'
+            )
+
+        anonymous_ids = {item['id'] for item in anonymous_response.data['results']}
+        self.assertIn(public_attachment.id, anonymous_ids)
+        self.assertNotIn(segmented_attachment.id, anonymous_ids)
+
+        device_ids = {item['id'] for item in device_response.data['results']}
+        self.assertIn(public_attachment.id, device_ids)
+        self.assertIn(segmented_attachment.id, device_ids)
+
     def test_announcement_list_supports_pagination_search_filter_and_ordering(self):
         Announcement.objects.create(
             author=self.staff_user,
