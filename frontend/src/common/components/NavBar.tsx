@@ -29,28 +29,15 @@ const NavBar: React.FC = () => {
     );
   }
 
-  const usuarioLogadoId = userData?.id || "u1";
-  const permissoesSalvas = localStorage.getItem(`permissoes_${usuarioLogadoId}`);
-  const roleSalvo = localStorage.getItem(`user_role_${usuarioLogadoId}`);
+  const roleAtual = userData.role;
 
-  const roleAtual = (roleSalvo || userData.role || 'colaborador').toLowerCase() as 'gestor' | 'colaborador';
-
-  const acessosReativos = permissoesSalvas ? JSON.parse(permissoesSalvas) : {
-    controlAcess: roleAtual === 'gestor',
-    announcement: true,
-    idtVisual: roleAtual === 'gestor',
-    dashboardGestor: roleAtual === 'gestor',
-    isAdmin: roleAtual === 'gestor'
-  };
-
-  // 2. Mapeamento direto das permissões em sincronia fina com o SideMenu
   const permissions = {
-    painelGestor: acessosReativos.isAdmin || acessosReativos.dashboardGestor,
-    controleAcessos: acessosReativos.isAdmin || acessosReativos.controlAcess,
-    editorComunicados: acessosReativos.isAdmin || acessosReativos.announcement,
-    configIdentidade: acessosReativos.isAdmin || acessosReativos.idtVisual,
-    comunicados: true, // Visível a todos os usuários
-    conversas: true    // Visível a todos os usuários
+    painelGestor: userData.permissoes.isAdmin || userData.permissoes.dashboardGestor,
+    controleAcessos: userData.permissoes.isAdmin || userData.permissoes.controlAcess,
+    editorComunicados: userData.permissoes.isAdmin || userData.permissoes.announcement,
+    configIdentidade: userData.permissoes.isAdmin || userData.permissoes.idtVisual,
+    comunicados: true,
+    conversas: true
   };
 
   return (
