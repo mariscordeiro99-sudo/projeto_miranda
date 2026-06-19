@@ -1,0 +1,165 @@
+.identity-container {
+    padding: 30px;
+    min-height: calc(100vh - 70px); /* Desconta a altura estimada da NavBar */
+    background-color: #f4f7f6;
+    font-family: 'Open Sans', sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.identity-header h2 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: bold;
+    color: #000000;
+}
+
+.identity-header p {
+    margin: 4px 0 0 0;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.identity-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.identity-card-panel {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.identity-card {
+    background: #ffffff;
+    max-width: 500px;
+    width: 100%;
+    padding: 40px 30px;
+    border-radius: 30px; /* Mantém o padrão de 30px do seu Login */
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+.identity-card-title {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: bold;
+    color: #000000;
+}
+
+.identity-card-description {
+    margin: 0 0 24px 0;
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.identity-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.identity-preview-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.identity-preview-box {
+    width: 160px;
+    height: 160px;
+    border-radius: 16px;
+    border: 2px dashed #4169E1; /* Respeita a cor Royal Blue */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f8fafc;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+}
+
+.identity-preview-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 10px;
+}
+
+.identity-preview-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.btn-upload-custom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: 2px solid #4169E1;
+    color: #4169E1;
+    padding: 10px 20px;
+    border-radius: 12px; /* Mantém o padrão de 12px do input */
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-upload-custom:hover {
+    background-color: rgba(65, 105, 225, 0.05);
+    border-color: #7f00ff;
+    color: #7f00ff;
+}
+
+.identity-divider {
+    width: 100%;
+    height: 1px;
+    background-color: #e2e8f0;
+    margin: 20px 0;
+}
+
+.identity-actions {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-submit-identity {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    height: 50px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    background: linear-gradient(90deg, #4169E1 0%, #7f00ff 100%); /* Gradiente idêntico ao Login */
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 16px;
+    transition: transform 0.2s, opacity 0.3s;
+    box-shadow: 0 4px 15px rgba(65, 105, 225, 0.3);
+}
+
+.btn-submit-identity:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
+
+.btn-submit-identity:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
