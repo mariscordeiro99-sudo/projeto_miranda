@@ -10,6 +10,7 @@ import { CommunicationPage } from '../pages/communication';
 import { ConversationPage } from '../pages/conversation';
 import { ControlAcessPage } from '../pages/controlAcess';
 import { AnnouncementsEdtPage } from '../pages/announEdt';
+import { IdentificationPage } from '../pages/identification';
 import { AppRoutes } from '../routes/types/loginReg';
 import { RegisterPage } from '../pages/register';
 import { ProtectedRoute } from './protectedRoute';
@@ -54,6 +55,7 @@ export const AppRouter: React.FC = () => {
           <Route path={AppRoutes.CONVERSAS} element={<ConversationPage />} />
           <Route path={AppRoutes.EDICAO_COMUNICADOS} element={<AnnouncementsEdtPage />} />
           <Route path={AppRoutes.CONTROLE_ACESSO} element={<ControlAcessPage />} />
+          <Route path={AppRoutes.IDENTIFICATION} element={<IdentificationPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to={AppRoutes.LOGIN} replace />} />

@@ -64,7 +64,7 @@ const SideMenu: React.FC<SideMenuProps> = ({ isOpen, onClose, userRole, permissi
               )}
 
               {canSee('configIdentidade') && (
-                <Link to="/identidade" className="menu-link" onClick={onClose}>
+                <Link to="/identification" className="menu-link" onClick={onClose}>
                   <Palette size={20} /> Identidade Visual
                 </Link>
               )}

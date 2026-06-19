@@ -18,8 +18,10 @@ export const useNavBar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isProfileCardOpen, setIsProfileCardOpen] = useState<boolean>(false);
 
-  const [userData] = useState<NavBarUserData | null>(() => {
+  const [userData, setUserData] = useState<NavBarUserData | null>(() => {
     const storedUser = localStorage.getItem('user_data');
+    const brasaoSalvo = localStorage.getItem('instituicao_brasao'); 
+    
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
@@ -27,7 +29,7 @@ export const useNavBar = () => {
           id: parsed.id || 'u1',
           nome: parsed.nome || 'Usuário',
           foto: parsed.fotoPerfil || parsed.foto || null,
-          brasao: parsed.brasaoUrl || parsed.brasao || null,
+          brasao: brasaoSalvo || parsed.brasaoUrl || parsed.brasao || null,
           role: parsed.roleAtual || parsed.role || 'colaborador',
           permissoes: parsed.permissoes || {
             controlAcess: false,
@@ -44,6 +46,27 @@ export const useNavBar = () => {
     }
     return null;
   });
+
+  useEffect(() => {
+    const escutarMudancaBrasao = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        setUserData((prevData) => {
+          if (!prevData) return null;
+          return {
+            ...prevData,
+            brasao: customEvent.detail
+          };
+        });
+      }
+    };
+
+    window.addEventListener('nexa_brasao_updated', escutarMudancaBrasao);
+
+    return () => {
+      window.removeEventListener('nexa_brasao_updated', escutarMudancaBrasao);
+    };
+  }, []);
 
   useEffect(() => {
     if (!userData) {

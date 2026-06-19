@@ -7,5 +7,6 @@ export const AppRoutes = {
   COMUNICADOS: '/comunicados',
   CONVERSAS: '/conversas',
   EDICAO_COMUNICADOS: '/edicao-comunicados',
-  CONTROLE_ACESSO: '/controle-acesso'
+  CONTROLE_ACESSO: '/controle-acesso',
+  IDENTIFICATION: '/identification'
 }

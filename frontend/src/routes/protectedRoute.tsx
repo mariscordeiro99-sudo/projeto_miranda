@@ -47,6 +47,10 @@ export const ProtectedRoute: React.FC = () => {
     return <Navigate to={AppRoutes.COMUNICADOS} replace />;
   }
 
+  if (location.pathname === AppRoutes.IDENTIFICATION && !permissoes.idtVisual) {
+    return <Navigate to={AppRoutes.COMUNICADOS} replace />;
+  }
+
   return (
     <div className="app-layout">
       <NavBar />
