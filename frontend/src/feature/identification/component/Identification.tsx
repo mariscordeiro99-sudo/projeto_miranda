@@ -1,7 +1,7 @@
 import React from 'react';
 import { Palette, Upload, Save, Image as ImageIcon } from 'lucide-react';
 import { useIdentidade } from '../hook/useIdentification';
-import '../styles/identification.css';
+import '../style/identification.css';
 
 export const IdentityPage: React.FC = () => {
   const {

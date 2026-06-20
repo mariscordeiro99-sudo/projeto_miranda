@@ -1,8 +1,7 @@
 import { useState, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import type { FormIdentidadeState} from '../types/identification';
-
-const BRASAO_PADRAO_SISTEMA = '../../../assets/logo-sBg.png';
+import BRASAO_PADRAO_SISTEMA from '../../../assets/images/logo-sBg.png';
 
 export const useIdentidade = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);

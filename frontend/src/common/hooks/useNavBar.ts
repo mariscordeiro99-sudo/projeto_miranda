@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { AppRoutes } from '../../routes/types/loginReg';
 import type { PermissoesUsuario } from '../../feature/controlAcess/types/typeAcess';
+import BRASAO_PADRAO_SISTEMA from '../../assets/images/logo-sBg.png';
 
 interface NavBarUserData {
   id: string;
@@ -29,7 +30,7 @@ export const useNavBar = () => {
           id: parsed.id || 'u1',
           nome: parsed.nome || 'Usuário',
           foto: parsed.fotoPerfil || parsed.foto || null,
-          brasao: brasaoSalvo || parsed.brasaoUrl || parsed.brasao || null,
+          brasao: brasaoSalvo || parsed.brasaoUrl || parsed.brasao || BRASAO_PADRAO_SISTEMA,
           role: parsed.roleAtual || parsed.role || 'colaborador',
           permissoes: parsed.permissoes || {
             controlAcess: false,

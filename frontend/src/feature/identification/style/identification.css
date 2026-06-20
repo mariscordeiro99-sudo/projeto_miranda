@@ -1,6 +1,7 @@
 .identity-container {
     padding: 30px;
-    min-height: calc(100vh - 70px); /* Desconta a altura estimada da NavBar */
+    padding-top: 100px;
+    min-height: calc(100vh - 70px);
     background-color: #f4f7f6;
     font-family: 'Open Sans', sans-serif;
     display: flex;
