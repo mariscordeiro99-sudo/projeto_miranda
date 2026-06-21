@@ -1,12 +1,15 @@
 import { useState, useRef } from 'react';
 import type { ChangeEvent } from 'react';
 import type { UserProfileData, PasswordChangeState, ProfileStep } from '../types/profileEdit';
+import type { ApiError } from '../types/apiError';
+import api from '../services/api';
 
 interface UseProfileEditProps {
   isOpen: boolean;
   onClose: () => void;
   initialData: { email: string; fotoUrl: string };
 }
+
 
 export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,12 +66,20 @@ export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditP
 
     setIsLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await api.post(`/usuarios/solicitar-codigo-senha`, {
+        senhaAtual: passwordData.senhaAtual,
+        novaSenha: passwordData.novaSenha,
+      });
+
       setStep('VERIFICACAO_CODIGO');
       alert(`Código de verificação enviado para o e-mail: ${profileData.email}`);
     } catch (error) {
       console.error('Erro ao solicitar troca de senha:', error);
-      alert('Erro ao enviar código de verificação.');
+
+      const apiError = error as ApiError;
+      const mensagemErro = apiError.response?.data?.detail || 'Erro ao enviar código de verificação.';
+
+      alert(mensagemErro);
     } finally {
       setIsLoading(false);
     }
@@ -79,13 +90,24 @@ export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditP
     setIsLoading(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+      const formData = new FormData();
+      formData.append('email', profileData.email);
 
-      if (step === 'VERIFICACAO_CODIGO' && passwordData.codigoVerificacao !== '123456') {
-        alert('Código de verificação incorreto! Use "123456" para testar no front.');
-        setIsLoading(false);
-        return;
+      if (profileData.fotoFile) {
+        formData.append('foto', profileData.fotoFile);
       }
+
+      if (step === 'VERIFICACAO_CODIGO') {
+        formData.append('senhaAtual', passwordData.senhaAtual);
+        formData.append('novaSenha', passwordData.novaSenha);
+        formData.append('codigoVerificacao', passwordData.codigoVerificacao);
+      }
+
+      await api.put(`/usuarios/perfil/atualizar`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       alert('Perfil atualizado com sucesso!');
 
@@ -93,8 +115,12 @@ export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditP
       setPasswordData({ senhaAtual: '', novaSenha: '', confirmarNovaSenha: '', codigoVerificacao: '' });
       onClose();
     } catch (error) {
-      console.error('Erro ao solicitar troca de senha:', error);
-      alert('Erro ao enviar código de verificação.');
+      console.error('Erro ao atualizar perfil:', error);
+
+      const apiError = error as ApiError;
+      const mensagemErro = apiError.response?.data?.detail || 'Erro ao salvar as alterações do perfil.';
+
+      alert(mensagemErro);
     } finally {
       setIsLoading(false);
     }
