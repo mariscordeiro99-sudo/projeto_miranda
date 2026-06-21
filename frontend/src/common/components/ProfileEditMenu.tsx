@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Camera, Mail, Lock, ShieldCheck, ArrowLeft, Loader2 } from 'lucide-react';
 import { useProfileEdit } from '../hooks/useProfileEdit';
-import '../style/profileEdit.css';
+import '../styles/profileEdit.css';
 
 interface ProfileEditMenuProps {
   isOpen: boolean;

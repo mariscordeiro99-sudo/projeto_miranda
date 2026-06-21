@@ -4,9 +4,9 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(15, 23, 42, 0.4);
+  background-color: rgba(15, 23, 42, 0.4); 
   backdrop-filter: blur(4px);
-  z-index: 9999;
+  z-index: 10004;
   display: flex;
   justify-content: flex-end;
   animation: fadeIn 0.2s ease-out;
@@ -17,6 +17,7 @@
   max-width: 440px;
   height: 100%;
   background-color: #ffffff;
+  z-index: 10005;
   box-shadow: -4px 0 25px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
