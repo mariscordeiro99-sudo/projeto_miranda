@@ -1,5 +1,5 @@
-import React from 'react';
-import { User, Send, MessageSquare } from 'lucide-react';
+import React, { useRef } from 'react';
+import { User, Send, MessageSquare, Mic, MicOff, Paperclip, Camera, FileText } from 'lucide-react';
 import { useConversas } from '../hooks/useConversation';
 import '../style/conversation.css';
 
@@ -13,8 +13,26 @@ export const ConversasPage: React.FC = () => {
         setMensagemInput,
         enviarMensagem,
         isLoading,
-        currentUserId
+        currentUserId,
+        isGravandoAudio,
+        iniciarGravacaoAudio,
+        pararGravacaoAudio,
+        enviarArquivoAnexo,
+        capturarFotoCamera
     } = useConversas();
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            enviarArquivoAnexo(file);
+        }
+    };
+
+    const dispararSeletorArquivo = () => {
+        fileInputRef.current?.click();
+    };
 
     return (
         <main className="chat-container">
@@ -84,7 +102,30 @@ export const ConversasPage: React.FC = () => {
                                 return (
                                     <div key={msg.id} className={`message-row ${isMe ? 'is-me' : 'is-other'}`}>
                                         <div className="message-bubble">
-                                            <p className="message-text">{msg.texto}</p>
+
+                                            {msg.tipo === 'texto' && (
+                                                <p className="message-text">{msg.texto}</p>
+                                            )}
+
+                                            {msg.tipo === 'imagem' && msg.midiaUrl && (
+                                                <img src={msg.midiaUrl} alt="Imagem enviada" className="chat-media-preview image" />
+                                            )}
+
+                                            {msg.tipo === 'video' && msg.midiaUrl && (
+                                                <video src={msg.midiaUrl} controls className="chat-media-preview video" />
+                                            )}
+
+                                            {msg.tipo === 'audio' && msg.midiaUrl && (
+                                                <audio src={msg.midiaUrl} controls className="chat-media-player audio" />
+                                            )}
+
+                                            {msg.tipo === 'documento' && msg.midiaUrl && (
+                                                <a href={msg.midiaUrl} target="_blank" rel="noopener noreferrer" className="chat-document-link">
+                                                    <FileText size={24} />
+                                                    <span className="doc-name">{msg.nomeArquivo || 'Visualizar PDF / Documento'}</span>
+                                                </a>
+                                            )}
+
                                             <span className="message-time">{msg.timestamp}</span>
                                         </div>
                                     </div>
@@ -92,17 +133,49 @@ export const ConversasPage: React.FC = () => {
                             })}
                         </div>
 
-                        <form className="chat-input-footer" onSubmit={enviarMensagem}>
-                            <input
-                                type="text"
-                                placeholder="Digite sua mensagem..."
-                                value={mensagemInput}
-                                onChange={(e) => setMensagemInput(e.target.value)}
-                            />
-                            <button type="submit" className="send-msg-btn" aria-label="Enviar mensagem">
-                                <Send size={18} />
-                            </button>
-                        </form>
+                        <footer className="chat-input-footer-container">
+                            <form className="chat-input-footer" onSubmit={enviarMensagem}>
+
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileChange}
+                                    accept=".mp4,.mp3,.png,.jpg,.jpeg,.pdf"
+                                    className="hidden-file-input"
+                                    style={{ display: 'none' }}
+                                />
+
+                                <div className="chat-action-buttons">
+                                    <button type="button" className="chat-media-btn" onClick={dispararSeletorArquivo} title="Anexar Arquivo (Max 50MB)">
+                                        <Paperclip size={20} />
+                                    </button>
+                                    <button type="button" className="chat-media-btn" onClick={capturarFotoCamera} title="Tirar Foto com a Câmera">
+                                        <Camera size={20} />
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className={`chat-media-btn btn-audio-recorder ${isGravandoAudio ? 'recording' : ''}`}
+                                        onClick={isGravandoAudio ? pararGravacaoAudio : iniciarGravacaoAudio}
+                                        title={isGravandoAudio ? "Parar e Enviar" : "Gravar Áudio"}
+                                    >
+                                        {isGravandoAudio ? <MicOff size={20} color="#ef4444" /> : <Mic size={20} />}
+                                    </button>
+                                </div>
+
+                                <input
+                                    type="text"
+                                    placeholder={isGravandoAudio ? "Gravando áudio... clique no microfone para parar e enviar" : "Digite sua mensagem..."}
+                                    value={mensagemInput}
+                                    onChange={(e) => setMensagemInput(e.target.value)}
+                                    disabled={isGravandoAudio}
+                                />
+
+                                <button type="submit" className="send-msg-btn" aria-label="Enviar mensagem" disabled={isGravandoAudio || !mensagemInput.trim()}>
+                                    <Send size={18} />
+                                </button>
+                            </form>
+                        </footer>
                     </>
                 ) : (
                     <div className="chat-empty-state">

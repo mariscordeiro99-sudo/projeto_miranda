@@ -1,8 +1,13 @@
+export type TipoMidia = 'texto' | 'audio' | 'imagem' | 'video' | 'documento';
+
 export interface Mensagem {
   id: string;
   senderId: string;
-  texto: string;
+  texto?: string;
   timestamp: string;
+  tipo: TipoMidia;
+  midiaUrl?: string;
+  nomeArquivo?: string;
 }
 
 export interface ChatContato {

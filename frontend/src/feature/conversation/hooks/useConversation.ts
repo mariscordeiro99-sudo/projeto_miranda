@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
-import type { ChatContato, Mensagem } from '../types/conversation';
+import { useState, useEffect, useRef } from 'react';
+import type { ChatContato, Mensagem, TipoMidia } from '../types/conversation';
+import api from '../../../common/services/api';
+import type { ApiError } from '../../../common/types/apiError';
 
 export const useConversas = () => {
   const [contatos, setContatos] = useState<ChatContato[]>([]);
@@ -8,45 +10,28 @@ export const useConversas = () => {
   const [mensagemInput, setMensagemInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Recupera o ID do usuário logado para simular o remetente
+  const [isGravandoAudio, setIsGravandoAudio] = useState<boolean>(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const currentUserId = "user-logado-123";
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024;
+  const FORMATOS_PERMITIDOS = ['video/mp4', 'audio/mp3', 'audio/mpeg', 'image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+
   useEffect(() => {
-    // Simula carga inicial de contatos do sistema Nexa
     const carregarContatos = async () => {
       setIsLoading(true);
       try {
-        await new Promise((resolve) => setTimeout(resolve, 800)); // Delay artificial
-        
-        const mockContatos: ChatContato[] = [
-          {
-            id: "1",
-            nome: "Mariana Costa (Gestão)",
-            foto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150",
-            role: "gestor",
-            ultimaMensagem: "Pode me enviar o relatório de acessos atualizado?",
-            timestampUltima: "10:42",
-            naoLidas: 2
-          },
-          {
-            id: "2",
-            nome: "Roberto Alves",
-            foto: null,
-            role: "colaborador",
-            ultimaMensagem: "Entendido, vou checar o mural.",
-            timestampUltima: "Ontem",
-            naoLidas: 0
-          }
-        ];
-        
-        setContatos(mockContatos);
+        const response = await api.get('/chat/contatos');
+        setContatos(response.data);
       } catch (error) {
-        console.error("Erro ao carregar contatos:", error);
+        const apiError = error as ApiError;
+        console.error("Erro ao carregar contatos via API:", apiError.response?.data?.detail || error);
       } finally {
         setIsLoading(false);
       }
     };
-
     carregarContatos();
   }, []);
 
@@ -55,60 +40,155 @@ export const useConversas = () => {
       setMensagens([]);
       return;
     }
+    const carregarHistorico = async () => {
+      try {
+        await api.post(`/chat/contatos/${contatoAtivo.id}/ler`);
+        setContatos(prev => prev.map(c => c.id === contatoAtivo.id ? { ...c, naoLidas: 0 } : c));
 
-    const carregarHistorico = () => {
-      setContatos(prev => prev.map(c => c.id === contatoAtivo.id ? { ...c, naoLidas: 0 } : c));
-
-      const historicoMock: Mensagem[] = [
-        {
-          id: "m1",
-          senderId: contatoAtivo.id,
-          texto: `Olá! Sou o ${contatoAtivo.nome}. Como posso te ajudar com os comunicados hoje?`,
-          timestamp: "10:30"
-        },
-        {
-          id: "m2",
-          senderId: currentUserId,
-          texto: "Oi! Tudo bem? Estou verificando as permissões do painel.",
-          timestamp: "10:35"
-        }
-      ];
-
-      if (contatoAtivo.ultimaMensagem && contatoAtivo.id === "1") {
-        historicoMock.push({
-          id: "m3",
-          senderId: contatoAtivo.id,
-          texto: contatoAtivo.ultimaMensagem,
-          timestamp: "10:42"
-        });
+        const response = await api.get(`/chat/mensagens/${contatoAtivo.id}`);
+        setMensagens(response.data);
+      } catch (error) {
+        const apiError = error as ApiError;
+        console.error("Erro ao carregar histórico via API:", apiError.response?.data?.detail || error);
       }
-
-      setMensagens(historicoMock);
     };
-
     carregarHistorico();
   }, [contatoAtivo]);
 
-  const enviarMensagem = (e: React.FormEvent) => {
+  const anexarNovaMensagemLocal = (novaMsg: Mensagem) => {
+    setMensagens(prev => [...prev, novaMsg]);
+    setContatos(prev => prev.map(c =>
+      c.id === contatoAtivo?.id
+        ? { ...c, ultimaMensagem: novaMsg.texto || `[${novaMsg.tipo}]`, timestampUltima: novaMsg.timestamp }
+        : c
+    ));
+  };
+
+  const enviarMensagem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!mensagemInput.trim() || !contatoAtivo) return;
 
-    const novaMsg: Mensagem = {
-      id: `msg-${Date.now()}`,
-      senderId: currentUserId,
+    const payload = {
+      receiverId: contatoAtivo.id,
       texto: mensagemInput.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      tipo: 'texto'
     };
 
-    setMensagens(prev => [...prev, novaMsg]);
-    
-    setContatos(prev => prev.map(c => 
-      c.id === contatoAtivo.id 
-        ? { ...c, ultimaMensagem: novaMsg.texto, timestampUltima: novaMsg.timestamp } 
-        : c
-    ));
+    try {
+      const response = await api.post('/chat/enviar', payload);
+      anexarNovaMensagemLocal(response.data);
+      setMensagemInput('');
+    } catch (error) {
+      const apiError = error as ApiError;
+      console.error("Detalhes do erro:", apiError);
+      alert(apiError.response?.data?.detail || 'Erro ao enviar mensagem de texto.');
+    }
+  };
 
-    setMensagemInput('');
+  const validarArquivo = (file: File): boolean => {
+    if (file.size > MAX_FILE_SIZE) {
+      alert('O arquivo excede o limite máximo de 50MB corporativo.');
+      return false;
+    }
+    if (!FORMATOS_PERMITIDOS.includes(file.type)) {
+      alert('Formato não suportado. Envie MP4, MP3, PNG, JPG ou PDF.');
+      return false;
+    }
+    return true;
+  };
+
+  const extrairTipoMidia = (mimeType: string): TipoMidia => {
+    if (mimeType.startsWith('image/')) return 'imagem';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    return 'documento';
+  };
+
+  const enviarArquivoAnexo = async (file: File) => {
+    if (!contatoAtivo || !validarArquivo(file)) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('receiverId', contatoAtivo.id);
+    formData.append('tipo', extrairTipoMidia(file.type));
+
+    try {
+      const response = await api.post('/chat/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      anexarNovaMensagemLocal(response.data);
+    } catch (error) {
+      const apiError = error as ApiError;
+      console.error("Detalhes do erro:", apiError);
+      alert(apiError.response?.data?.detail || 'Falha ao enviar o arquivo anexo.');
+    }
+  };
+
+  const iniciarGravacaoAudio = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
+        const audioFile = new File([audioBlob], `audio-${Date.now()}.mp3`, { type: 'audio/mp3' });
+        await enviarArquivoAnexo(audioFile);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsGravandoAudio(true);
+    } catch (err) {
+      const apiError = err as ApiError;
+      console.error("Detalhes do erro:", apiError);
+      alert(apiError.response?.data?.detail || 'Permissão de microfone não concedida.');
+    }
+  };
+
+  const pararGravacaoAudio = () => {
+    if (mediaRecorderRef.current && isGravandoAudio) {
+      mediaRecorderRef.current.stop();
+      setIsGravandoAudio(false);
+    }
+  };
+
+  const capturarFotoCamera = async () => {
+    if (!contatoAtivo) return;
+
+    const video = document.createElement('video');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      video.play();
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+
+      const context = canvas.getContext('2d');
+      context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          const fotoFile = new File([blob], `screenshot-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          await enviarArquivoAnexo(fotoFile);
+        }
+        stream.getTracks().forEach(track => track.stop());
+      }, 'image/jpeg');
+
+    } catch (err) {
+      const apiError = err as ApiError;
+      console.error("Detalhes do erro:", apiError);
+      alert(apiError.response?.data?.detail || 'Câmera indisponível ou permissão negada.');
+    }
   };
 
   return {
@@ -120,6 +200,11 @@ export const useConversas = () => {
     setMensagemInput,
     enviarMensagem,
     isLoading,
-    currentUserId
+    currentUserId,
+    isGravandoAudio,
+    iniciarGravacaoAudio,
+    pararGravacaoAudio,
+    enviarArquivoAnexo,
+    capturarFotoCamera
   };
 };
