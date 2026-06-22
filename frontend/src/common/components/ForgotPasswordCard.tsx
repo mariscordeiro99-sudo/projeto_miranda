@@ -20,6 +20,9 @@ export const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({
     setCodigoVerificacao,
     passwordData,
     isLoading,
+    rules,
+    isPasswordValid,
+    isConfirmationValid,
     handlePasswordChange,
     enviarEmailRecuperacao,
     validarCodigoSeguranca,
@@ -39,7 +42,7 @@ export const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({
             <ArrowLeft size={20} />
           </button>
         )}
-        <h2>Recuperar Senha</h2>
+        <h2 className="forgot-title">Recuperar Senha</h2>
       </header>
 
       <div className="forgot-card-body">
@@ -59,6 +62,7 @@ export const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({
                 <input
                   type="email"
                   id="forgot-email"
+                  className="forgot-form-input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu.email@nexa.com"
@@ -68,7 +72,7 @@ export const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({
               </div>
             </div>
 
-            <button type="submit" className="btn-submit-auth" disabled={isLoading}>
+            <button type="submit" className="btn-forgot-submit" disabled={isLoading}>
               {isLoading ? <Loader2 className="spinner" size={18} /> : 'Enviar Código'}
             </button>
           </form>
@@ -98,7 +102,7 @@ export const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({
               />
             </div>
 
-            <button type="submit" className="btn-submit-auth" disabled={isLoading}>
+            <button type="submit" className="btn-forgot-submit" disabled={isLoading}>
               {isLoading ? <Loader2 className="spinner" size={18} /> : 'Validar Código'}
             </button>
             <p className="forgot-test-hint">Dica de teste: Digite <strong>123456</strong></p>
@@ -119,12 +123,21 @@ export const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({
                   type="password"
                   id="novaSenha"
                   name="novaSenha"
+                  className={`forgot-form-input ${passwordData.novaSenha ? (isPasswordValid ? 'valid-border' : 'invalid-border') : ''}`}
                   value={passwordData.novaSenha}
                   onChange={handlePasswordChange}
-                  placeholder="No mínimo 6 caracteres"
+                  placeholder="Digite sua nova senha"
                   required
                   disabled={isLoading}
                 />
+              </div>
+
+              <div className="password-hints">
+                <span className={rules.length ? 'valid' : 'invalid'}>6-15 caracteres</span>
+                <span className={rules.upper ? 'valid' : 'invalid'}>Maiúscula</span>
+                <span className={rules.lower ? 'valid' : 'invalid'}>Minúscula</span>
+                <span className={rules.number ? 'valid' : 'invalid'}>Número</span>
+                <span className={rules.special ? 'valid' : 'invalid'}>Especial</span>
               </div>
             </div>
 
@@ -136,16 +149,21 @@ export const ForgotPasswordCard: React.FC<ForgotPasswordCardProps> = ({
                   type="password"
                   id="confirmarNovaSenha"
                   name="confirmarNovaSenha"
+                  className={`forgot-form-input ${passwordData.confirmarNovaSenha ? (isConfirmationValid ? 'valid-border' : 'invalid-border') : ''}`}
                   value={passwordData.confirmarNovaSenha}
                   onChange={handlePasswordChange}
-                  placeholder="Repita a senha nova"
+                  placeholder="Repita a nova senha"
                   required
                   disabled={isLoading}
                 />
               </div>
             </div>
 
-            <button type="submit" className="btn-submit-auth" disabled={isLoading}>
+            <button
+              type="submit"
+              className="btn-forgot-submit"
+              disabled={isLoading || !isPasswordValid || !isConfirmationValid}
+            >
               {isLoading ? <Loader2 className="spinner" size={18} /> : 'Redefinir Senha'}
             </button>
           </form>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
-import type { ForgotPasswordStep, NewPasswordData } from '../types/forgotPassword';
+import type { ForgotPasswordStep, NewPasswordData, PasswordRules } from '../types/forgotPassword';
+import api from '../services/api';
+import type { ApiError } from '../types/apiError';
 
 interface UseForgotPasswordProps {
     onSuccess: () => void;
@@ -16,27 +18,43 @@ export const useForgotPassword = ({ onSuccess }: UseForgotPasswordProps) => {
     });
     const [isLoading, setIsLoading] = useState<boolean>(false);
 
+    const rules: PasswordRules = {
+        length: passwordData.novaSenha.length >= 6 && passwordData.novaSenha.length <= 15,
+        upper: /[A-Z]/.test(passwordData.novaSenha),
+        lower: /[a-z]/.test(passwordData.novaSenha),
+        number: /[0-9]/.test(passwordData.novaSenha),
+        special: /[^A-Za-z0-9]/.test(passwordData.novaSenha)
+    };
+
+    const isPasswordValid = Object.values(rules).every(Boolean);
+    const isConfirmationValid = passwordData.confirmarNovaSenha.length > 0 && passwordData.novaSenha === passwordData.confirmarNovaSenha;
+
     const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setPasswordData((prev) => ({ ...prev, [name]: value }));
     };
 
+    const resetForm = () => {
+        setEmail('');
+        setCodigoVerificacao('');
+        setPasswordData({ novaSenha: '', confirmarNovaSenha: '' });
+        setStep('FORMULARIO_EMAIL');
+    };
+
     const enviarEmailRecuperacao = async (e: FormEvent) => {
         e.preventDefault();
-        if (!email) {
-            alert('Por favor, insira o seu e-mail.');
-            return;
-        }
+        const emailLimpo = email.trim();
+        if (!emailLimpo) return alert('Por favor, insira o seu e-mail.');
 
         setIsLoading(true);
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await api.post('/auth/forgot-password/request', { email: emailLimpo });
 
-            alert(`Código enviado com sucesso para: ${email}`);
+            alert(`Código de verificação enviado com sucesso para o e-mail corporativo.`);
             setStep('VERIFICACAO_CODIGO');
         } catch (error) {
-            console.error('Erro ao enviar e-mail:', error);
-            alert('Erro ao processar a solicitação.');
+            const apiError = error as ApiError;
+            alert(apiError.response?.data?.detail || 'E-mail não encontrado ou erro na operação.');
         } finally {
             setIsLoading(false);
         }
@@ -44,25 +62,20 @@ export const useForgotPassword = ({ onSuccess }: UseForgotPasswordProps) => {
 
     const validarCodigoSeguranca = async (e: FormEvent) => {
         e.preventDefault();
-        if (codigoVerificacao.length !== 6) {
-            alert('O código precisa ter exatamente 6 dígitos.');
-            return;
-        }
+        const token = codigoVerificacao.trim();
+        if (token.length !== 6) return alert('O código precisa ter exatamente 6 dígitos.');
 
         setIsLoading(true);
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            if (codigoVerificacao !== '123456') {
-                alert('Código inválido. Digite "123456" para testar no front.');
-                setIsLoading(false);
-                return;
-            }
+            await api.post('/auth/forgot-password/validate-token', {
+                email: email.trim(),
+                token
+            });
 
             setStep('NOVA_SENHA');
         } catch (error) {
-            console.error('Erro ao validar código:', error);
-            alert('Erro ao validar o código.');
+            const apiError = error as ApiError;
+            alert(apiError.response?.data?.detail || 'Código inválido ou expirado.');
         } finally {
             setIsLoading(false);
         }
@@ -70,36 +83,25 @@ export const useForgotPassword = ({ onSuccess }: UseForgotPasswordProps) => {
 
     const atualizarNovaSenha = async (e: FormEvent) => {
         e.preventDefault();
-        if (!passwordData.novaSenha || !passwordData.confirmarNovaSenha) {
-            alert('Por favor, preencha ambos os campos.');
-            return;
-        }
 
-        if (passwordData.novaSenha.length < 6) {
-            alert('A nova senha deve ter no mínimo 6 caracteres.');
-            return;
-        }
-
-        if (passwordData.novaSenha !== passwordData.confirmarNovaSenha) {
-            alert('As senhas digitadas não coincidem.');
-            return;
+        if (!isPasswordValid || !isConfirmationValid) {
+            return alert('Verifique os requisitos da senha antes de prosseguir.');
         }
 
         setIsLoading(true);
         try {
-            await new Promise((resolve) => setTimeout(resolve, 1200));
+            await api.post('/auth/forgot-password/reset', {
+                email: email.trim(),
+                token: codigoVerificacao.trim(),
+                nova_senha: passwordData.novaSenha
+            });
 
-            alert('Senha redefinida com sucesso! Você já pode fazer login.');
-
-            setStep('FORMULARIO_EMAIL');
-            setEmail('');
-            setCodigoVerificacao('');
-            setPasswordData({ novaSenha: '', confirmarNovaSenha: '' });
-
+            alert('Senha redefinida com sucesso! Você já pode entrar com suas novas credenciais.');
+            resetForm();
             onSuccess();
         } catch (error) {
-            console.error('Erro ao atualizar senha:', error);
-            alert('Erro ao salvar nova senha.');
+            const apiError = error as ApiError;
+            alert(apiError.response?.data?.detail || 'Erro ao tentar redefinir a sua senha.');
         } finally {
             setIsLoading(false);
         }
@@ -118,6 +120,9 @@ export const useForgotPassword = ({ onSuccess }: UseForgotPasswordProps) => {
         setCodigoVerificacao,
         passwordData,
         isLoading,
+        rules,
+        isPasswordValid,
+        isConfirmationValid,
         handlePasswordChange,
         enviarEmailRecuperacao,
         validarCodigoSeguranca,
