@@ -5,6 +5,7 @@ import type { ApiError } from '../../../common/types/apiError';
 
 export const useComunicados = () => {
   const [comunicados, setComunicados] = useState<Comunicado[]>([]);
+  const [comunicadoAtivo, setComunicadoAtivo] = useState<Comunicado | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,8 +45,19 @@ export const useComunicados = () => {
     };
   }, []);
 
+  const abrirComunicado = (comunicado: Comunicado) => {
+    setComunicadoAtivo(comunicado);
+  };
+
+  const fecharComunicado = () => {
+    setComunicadoAtivo(null);
+  };
+
   return {
     comunicados,
+    comunicadoAtivo,
+    abrirComunicado,
+    fecharComunicado,
     isLoading,
     error,
     refetch: () => carregarComunicados(true) 

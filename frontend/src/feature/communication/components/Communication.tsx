@@ -1,10 +1,16 @@
 import React from 'react';
-import { Calendar, User, Pin, Loader2 } from 'lucide-react';
+import { Calendar, User, Pin, Loader2, X, Download, FileText } from 'lucide-react';
 import { useComunicados } from '../hooks/useCommunication';
 import '../style/communication.css';
 
 const Comunicados: React.FC = () => {
-  const { comunicados, isLoading } = useComunicados();
+  const {
+    comunicados,
+    comunicadoAtivo,
+    abrirComunicado,
+    fecharComunicado,
+    isLoading
+  } = useComunicados();
 
   return (
     <main className="comunicados-container">
@@ -21,9 +27,11 @@ const Comunicados: React.FC = () => {
       ) : (
         <div className="comunicados-list">
           {comunicados.map((comunicado) => (
-            <article 
-              key={comunicado.id} 
+            <article
+              key={comunicado.id}
               className={`comunicado-card ${comunicado.fixado ? 'is-fixed' : ''}`}
+              onClick={() => abrirComunicado(comunicado)}
+              style={{ cursor: 'pointer' }}
             >
               {comunicado.fixado && (
                 <div className="pinned-badge">
@@ -43,15 +51,87 @@ const Comunicados: React.FC = () => {
               </div>
 
               <h3 className="comunicado-title">{comunicado.titulo}</h3>
-              <p className="comunicado-body">{comunicado.conteudo}</p>
+              <p className="comunicado-body-preview">{comunicado.conteudo}</p>
 
               {comunicado.imagemUrl && (
                 <div className="comunicado-image-wrapper">
                   <img src={comunicado.imagemUrl} alt={comunicado.titulo} className="comunicado-img" />
                 </div>
               )}
+
+              {comunicado.anexos && comunicado.anexos.length > 0 && (
+                <div className="comunicado-has-attachments">
+                  <FileText size={14} />
+                  <span>{comunicado.anexos.length} anexo(s) disponível(is)</span>
+                </div>
+              )}
             </article>
           ))}
+        </div>
+      )}
+
+      {comunicadoAtivo && (
+        <div className="comunicado-modal-overlay" onClick={fecharComunicado}>
+          <div className="comunicado-full-card" onClick={(e) => e.stopPropagation()}>
+
+            <header className="modal-header">
+              <div className="comunicado-meta">
+                <div className="meta-item">
+                  <User size={14} />
+                  <span>{comunicadoAtivo.autor}</span>
+                </div>
+                <div className="meta-item">
+                  <Calendar size={14} />
+                  <span>{comunicadoAtivo.data}</span>
+                </div>
+              </div>
+              <button className="close-modal-btn" onClick={fecharComunicado} aria-label="Fechar comunicado">
+                <X size={20} />
+              </button>
+            </header>
+
+            <div className="modal-body">
+              <h2 className="modal-title">{comunicadoAtivo.titulo}</h2>
+
+              {comunicadoAtivo.imagemUrl && (
+                <div className="modal-image-container">
+                  <img src={comunicadoAtivo.imagemUrl} alt={comunicadoAtivo.titulo} className="modal-full-img" />
+                </div>
+              )}
+
+              <p className="modal-text-content">{comunicadoAtivo.conteudo}</p>
+
+              {comunicadoAtivo.anexos && comunicadoAtivo.anexos.length > 0 && (
+                <div className="modal-attachments-section">
+                  <h4>Arquivos Disponíveis para Download</h4>
+                  <div className="attachments-grid">
+                    {comunicadoAtivo.anexos.map((anexo) => (
+                      <div key={anexo.id} className="attachment-item-card">
+                        <div className="attachment-info">
+                          <FileText size={20} color="#4169E1" />
+                          <div>
+                            <span className="attachment-name" title={anexo.nome}>{anexo.nome}</span>
+                            {anexo.tamanho && <small className="attachment-size">{anexo.tamanho}</small>}
+                          </div>
+                        </div>
+                        <a
+                          href={anexo.arquivoUrl}
+                          download
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="download-attachment-btn"
+                        >
+                          <Download size={16} />
+                          <span>Baixar</span>
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
         </div>
       )}
     </main>
