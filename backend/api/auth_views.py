@@ -69,12 +69,6 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if requested_manager_access:
-            return Response(
-                {'detail': 'Cadastro de gestor deve ser feito por um administrador autorizado.'},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         try:
             validate_profile_picture(profile_picture)
         except DRFValidationError as error:
@@ -126,6 +120,7 @@ class RegisterView(APIView):
                     user=user,
                     phone_number=phone,
                     role=Profile.ROLE_CITIZEN,
+                    manager_access_requested=requested_manager_access,
                     profile_picture=profile_picture,
                 )
         except cloudinary.exceptions.Error:
@@ -134,9 +129,16 @@ class RegisterView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
+        message = 'Usuário cadastrado com sucesso.'
+        if requested_manager_access:
+            message = 'Cadastro realizado. O acesso de gestor aguarda aprovação.'
+
         return Response(
             {
-                'message': 'Usuário cadastrado com sucesso.',
+                'message': message,
+                'manager_access_status': (
+                    'pending' if requested_manager_access else 'not_requested'
+                ),
                 'user': {
                     'username': user.username,
                     'email': user.email,
@@ -200,6 +202,18 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        profile = getattr(user, 'profile', None)
+        role = profile.role if profile else Profile.ROLE_CITIZEN
+        permissions_data = {
+            'controlAcess': bool(profile and profile.can_control_access),
+            'announcement': bool(profile and profile.can_manage_announcements),
+            'idtVisual': bool(profile and profile.can_manage_visual_identity),
+            'dashboardGestor': bool(
+                profile and profile.can_view_manager_dashboard
+            ),
+        }
+        permissions_data['isAdmin'] = all(permissions_data.values())
+
         token = issue_auth_token(user)
         token_expires_in = manager_token_ttl_seconds(user)
         return Response(
@@ -209,10 +223,27 @@ class LoginView(APIView):
                 'token_type': 'bearer',
                 'expires_in': token_expires_in,
                 'user': {
+                    'id': user.id,
                     'username': user.username,
                     'email': user.email,
                     'first_name': user.first_name,
                     'is_staff': user.is_staff,
+                    'is_superuser': user.is_superuser,
+                    'role_code': role,
+                    'role': (
+                        'gestor'
+                        if role == Profile.ROLE_MANAGER
+                        else 'colaborador'
+                    ),
+                    'roleAtual': (
+                        'gestor'
+                        if role == Profile.ROLE_MANAGER
+                        else 'colaborador'
+                    ),
+                    'manager_access_requested': bool(
+                        profile and profile.manager_access_requested
+                    ),
+                    'permissoes': permissions_data,
                 },
             },
             status=status.HTTP_200_OK,

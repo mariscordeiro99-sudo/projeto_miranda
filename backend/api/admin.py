@@ -257,8 +257,14 @@ class DocumentAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
-    list_display = ('user', 'phone_number', 'role', 'created_at')
-    list_filter = ('role',)
+    list_display = (
+        'user',
+        'phone_number',
+        'role',
+        'manager_access_requested',
+        'created_at',
+    )
+    list_filter = ('role', 'manager_access_requested')
     search_fields = ('user__username', 'user__email', 'phone_number')
 
 

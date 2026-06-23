@@ -23,6 +23,7 @@ from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from api import admin_report_views
 from api.health import DetailedHealthCheckView, HealthCheckView
+from api.views import UserPermissionsView
 
 urlpatterns = [
     path('', lambda request: redirect('admin/')), 
@@ -30,6 +31,8 @@ urlpatterns = [
     path('admin/reports/announcements-published/', admin_report_views.published_announcements_report, name='admin-report-announcements-published'),
     path('admin/reports/devices-active/', admin_report_views.active_devices_report, name='admin-report-devices-active'),
     path('admin/reports/delivery-failures/', admin_report_views.failed_deliveries_report, name='admin-report-delivery-failures'),
+    path('admin/users-permissions/', UserPermissionsView.as_view(), name='user-permissions-list'),
+    path('admin/users-permissions/<int:user_id>/', UserPermissionsView.as_view(), name='user-permissions-detail'),
     path('admin/', admin.site.urls),
     path('auth/', include('api.auth_urls')),
     path('health/', HealthCheckView.as_view(), name='health'),
