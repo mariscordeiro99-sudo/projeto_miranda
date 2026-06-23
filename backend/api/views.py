@@ -68,6 +68,37 @@ class CanControlAccess(permissions.BasePermission):
         )
 
 
+class CanViewDashboard(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser or user.is_staff:
+            return True
+
+        profile = getattr(user, 'profile', None)
+        return bool(
+            profile
+            and profile.role == Profile.ROLE_MANAGER
+            and profile.can_view_manager_dashboard
+        )
+
+
+class CanManageAnnouncements(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser or user.is_staff:
+            return True
+
+        profile = getattr(user, 'profile', None)
+        return bool(
+            profile
+            and profile.role == Profile.ROLE_MANAGER
+            and profile.can_manage_announcements
+        )
+
 class NoDestroyModelViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
 
@@ -164,7 +195,7 @@ class UserPermissionsView(APIView):
         )
         return {
             'id': str(user.id),
-            'nome': user.get_full_name() or user.username,
+            'nome': (user.first_name or user.username).strip() or user.username,
             'email': user.email,
             'foto': photo_url,
             'roleAtual': 'gestor' if is_manager else 'colaborador',
@@ -266,7 +297,7 @@ class UserPermissionsView(APIView):
 
 
 class DashboardReportView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [CanViewDashboard]
 
     @extend_schema(
         responses=inline_serializer(
@@ -285,6 +316,335 @@ class DashboardReportView(APIView):
     def get(self, request, *args, **kwargs):
         return Response(build_dashboard_report())
 
+
+class DashboardMetricsView(APIView):
+    permission_classes = [CanViewDashboard]
+
+    @extend_schema(
+        responses=inline_serializer(
+            name='DashboardMetricsResponse',
+            fields={
+                'usuariosAtivos': serializers.IntegerField(),
+                'mensagensEnviadas': serializers.IntegerField(),
+                'taxaVisualizacao': serializers.CharField(),
+            },
+        )
+    )
+    def get(self, request, *args, **kwargs):
+        report = build_dashboard_report(include_activity=False)
+        view_rate = report['delivery'].get('view_rate', 0)
+
+        if isinstance(view_rate, (int, float)):
+            view_rate = f'{view_rate:g}%'
+        else:
+            view_rate = f'{view_rate}%'
+
+        return Response({
+            'usuariosAtivos': report['users'].get('active', 0),
+            'mensagensEnviadas': report['delivery'].get('sent', 0),
+            'taxaVisualizacao': view_rate,
+        })
+
+
+class FrontendAnnouncementsView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        announcements = (
+            Announcement.objects
+            .select_related('author', 'institution')
+            .prefetch_related('attachments', 'segments')
+            .filter(status=Announcement.STATUS_PUBLISHED)
+            .filter(public_segment_visibility_filter(request))
+            .distinct()
+            .order_by('-pinned', '-published_at', '-created_at')
+        )
+
+        return Response([
+            self.serialize_announcement(request, announcement)
+            for announcement in announcements
+        ])
+
+    def serialize_announcement(self, request, announcement):
+        attachments = list(announcement.attachments.all())
+        image_attachment = next(
+            (
+                attachment
+                for attachment in attachments
+                if attachment.file_type == Attachment.TYPE_IMAGE
+            ),
+            None,
+        )
+
+        return {
+            'id': announcement.id,
+            'titulo': announcement.title,
+            'conteudo': announcement.content,
+            'data': self.format_date(announcement.published_at or announcement.created_at),
+            'autor': self.author_name(announcement.author),
+            'imagemUrl': self.file_url(request, image_attachment.file)
+            if image_attachment
+            else None,
+            'fixado': announcement.pinned,
+            'anexos': [
+                {
+                    'id': str(attachment.id),
+                    'nome': attachment.original_name,
+                    'arquivoUrl': self.file_url(request, attachment.file),
+                    'tamanho': self.file_size(attachment.file),
+                }
+                for attachment in attachments
+            ],
+        }
+
+    def author_name(self, author):
+        if not author:
+            return 'Sistema'
+        return author.get_full_name() or author.first_name or author.username
+
+    def format_date(self, value):
+        if not value:
+            return ''
+        return timezone.localtime(value).strftime('%d/%m/%Y')
+
+    def file_url(self, request, file_field):
+        if not file_field:
+            return None
+        try:
+            return request.build_absolute_uri(file_field.url)
+        except (AttributeError, ValueError):
+            return None
+
+    def file_size(self, file_field):
+        if not file_field:
+            return ''
+        try:
+            size = file_field.size
+        except (OSError, ValueError, AttributeError):
+            return ''
+
+        if size >= 1024 * 1024:
+            return f'{size / (1024 * 1024):.1f} MB'
+        if size >= 1024:
+            return f'{size / 1024:.1f} KB'
+        return f'{size} B'
+
+
+class AdminAnnouncementsView(APIView):
+    permission_classes = [CanManageAnnouncements]
+    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
+
+    def get(self, request, announcement_id=None, *args, **kwargs):
+        if announcement_id is not None:
+            announcement = self.get_announcement(announcement_id)
+            if not announcement:
+                return Response(
+                    {'detail': 'Comunicado nao encontrado.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            return Response(self.serialize_announcement(request, announcement))
+
+        announcements = self.get_queryset()
+        return Response([
+            self.serialize_announcement(request, announcement)
+            for announcement in announcements
+        ])
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        title = self.request_value(request, 'titulo', 'title')
+        content = self.request_value(request, 'texto', 'content', 'conteudo')
+
+        if not title or not content:
+            return Response(
+                {'detail': 'Titulo e texto do comunicado sao obrigatorios.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        announcement_status = self.model_status(
+            self.request_value(request, 'status') or 'ativo'
+        )
+        announcement = Announcement.objects.create(
+            author=request.user,
+            title=title,
+            content=content,
+            status=announcement_status,
+        )
+        self.create_attachments(request, announcement)
+        record_audit_log(request.user, 'announcement_created', announcement)
+
+        if announcement.status == Announcement.STATUS_PUBLISHED:
+            dispatch_published_announcement(announcement)
+
+        return Response(
+            self.serialize_announcement(request, announcement),
+            status=status.HTTP_201_CREATED,
+        )
+
+    @transaction.atomic
+    def put(self, request, announcement_id, *args, **kwargs):
+        return self.update(request, announcement_id, partial=False)
+
+    @transaction.atomic
+    def patch(self, request, announcement_id, *args, **kwargs):
+        return self.update(request, announcement_id, partial=True)
+
+    @transaction.atomic
+    def delete(self, request, announcement_id, *args, **kwargs):
+        announcement = self.get_announcement(announcement_id)
+        if not announcement:
+            return Response(
+                {'detail': 'Comunicado nao encontrado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        record_audit_log(request.user, 'announcement_deleted', announcement)
+        announcement.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def update(self, request, announcement_id, partial=True):
+        announcement = self.get_announcement(announcement_id)
+        if not announcement:
+            return Response(
+                {'detail': 'Comunicado nao encontrado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        title = self.request_value(request, 'titulo', 'title')
+        content = self.request_value(request, 'texto', 'content', 'conteudo')
+        status_value = self.request_value(request, 'status')
+
+        if not partial and (not title or not content):
+            return Response(
+                {'detail': 'Titulo e texto do comunicado sao obrigatorios.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        was_published = announcement.status == Announcement.STATUS_PUBLISHED
+        if title is not None:
+            if not title:
+                return Response(
+                    {'detail': 'Titulo do comunicado e obrigatorio.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            announcement.title = title
+        if content is not None:
+            if not content:
+                return Response(
+                    {'detail': 'Texto do comunicado e obrigatorio.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            announcement.content = content
+        if status_value is not None:
+            announcement.status = self.model_status(status_value)
+            if announcement.status == Announcement.STATUS_PUBLISHED and not announcement.published_at:
+                announcement.published_at = timezone.now()
+
+        announcement.save()
+        self.create_attachments(request, announcement)
+        record_audit_log(request.user, 'announcement_updated', announcement)
+
+        if not was_published and announcement.status == Announcement.STATUS_PUBLISHED:
+            dispatch_published_announcement(announcement)
+
+        return Response(self.serialize_announcement(request, announcement))
+
+    def get_queryset(self):
+        return (
+            Announcement.objects
+            .select_related('author', 'institution')
+            .prefetch_related('attachments', 'segments')
+            .all()
+            .order_by('-created_at')
+        )
+
+    def get_announcement(self, announcement_id):
+        return self.get_queryset().filter(pk=announcement_id).first()
+
+    def request_value(self, request, *names):
+        for name in names:
+            if name in request.data:
+                value = request.data.get(name)
+                if value is None:
+                    return ''
+                return str(value).strip()
+        return None
+
+    def model_status(self, value):
+        normalized = str(value or '').strip().lower()
+        if normalized in {'ativo', 'active', 'published', 'publicado'}:
+            return Announcement.STATUS_PUBLISHED
+        if normalized in {'arquivado', 'archived'}:
+            return Announcement.STATUS_ARCHIVED
+        return Announcement.STATUS_DRAFT
+
+    def frontend_status(self, announcement):
+        if announcement.status == Announcement.STATUS_PUBLISHED:
+            return 'ativo'
+        return 'inativo'
+
+    def create_attachments(self, request, announcement):
+        for uploaded_file in self.get_attachment_files(request):
+            prepared_file = prepare_attachment(uploaded_file)
+            Attachment.objects.create(
+                announcement=announcement,
+                file=prepared_file,
+                original_name=prepared_file.name,
+                file_type=attachment_type(prepared_file),
+            )
+
+    def get_attachment_files(self, request):
+        files = []
+        for field_name in ('arquivos', 'attachments', 'files', 'file'):
+            files.extend(request.FILES.getlist(field_name))
+        return files
+
+    def serialize_announcement(self, request, announcement):
+        attachments = list(announcement.attachments.all())
+        content = announcement.content or ''
+        return {
+            'id': str(announcement.id),
+            'titulo': announcement.title,
+            'resumo': self.summary(content),
+            'texto': content,
+            'status': self.frontend_status(announcement),
+            'dataCriacao': self.format_date(announcement.created_at),
+            'anexos': [
+                {
+                    'id': str(attachment.id),
+                    'nome': attachment.original_name,
+                    'tipo': self.frontend_attachment_type(attachment),
+                    'url': self.file_url(request, attachment.file),
+                }
+                for attachment in attachments
+            ],
+        }
+
+    def summary(self, content):
+        compact = ' '.join(str(content or '').split())
+        if len(compact) <= 180:
+            return compact
+        return f'{compact[:177]}...'
+
+    def frontend_attachment_type(self, attachment):
+        if attachment.file_type == Attachment.TYPE_IMAGE:
+            return 'image'
+        if attachment.file_type == Attachment.TYPE_VIDEO:
+            return 'video'
+        return 'pdf'
+
+    def format_date(self, value):
+        if not value:
+            return ''
+        return timezone.localtime(value).strftime('%d/%m/%Y')
+
+    def file_url(self, request, file_field):
+        if not file_field:
+            return None
+        try:
+            return request.build_absolute_uri(file_field.url)
+        except (AttributeError, ValueError):
+            return None
 
 class DocumentViewSet(NoDestroyModelViewSet):
     queryset = Document.objects.all()

@@ -1,9 +1,17 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from .chat_views import (
+    ChatContactsView,
+    ChatMarkReadView,
+    ChatMessagesView,
+    ChatSendView,
+    ChatUploadView,
+)
 from .views import (
     AnnouncementViewSet,
     AttachmentViewSet,
     AuditLogViewSet,
+    DashboardMetricsView,
     DashboardReportView,
     DeactivateOwnAccountView,
     DeliveryLogViewSet,
@@ -34,6 +42,17 @@ router.register(r'privacy-requests', PrivacyRequestViewSet, basename='privacy-re
 
 urlpatterns = [
     path('hello/', HelloView.as_view(), name='hello'),
+    path('dashboard/metrics/', DashboardMetricsView.as_view(), name='dashboard-metrics'),
+    path('chat/contatos', ChatContactsView.as_view(), name='chat-contacts'),
+    path('chat/contatos/', ChatContactsView.as_view(), name='chat-contacts-slash'),
+    path('chat/contatos/<int:contact_id>/ler', ChatMarkReadView.as_view(), name='chat-mark-read'),
+    path('chat/contatos/<int:contact_id>/ler/', ChatMarkReadView.as_view(), name='chat-mark-read-slash'),
+    path('chat/mensagens/<int:contact_id>', ChatMessagesView.as_view(), name='chat-messages'),
+    path('chat/mensagens/<int:contact_id>/', ChatMessagesView.as_view(), name='chat-messages-slash'),
+    path('chat/enviar', ChatSendView.as_view(), name='chat-send'),
+    path('chat/enviar/', ChatSendView.as_view(), name='chat-send-slash'),
+    path('chat/upload', ChatUploadView.as_view(), name='chat-upload'),
+    path('chat/upload/', ChatUploadView.as_view(), name='chat-upload-slash'),
     path('reports/dashboard/', DashboardReportView.as_view(), name='dashboard-report'),
     path('privacy/deactivate-account/', DeactivateOwnAccountView.as_view(), name='privacy-deactivate-account'),
     path('', include(router.urls)),

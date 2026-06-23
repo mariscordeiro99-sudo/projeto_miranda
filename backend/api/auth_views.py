@@ -69,8 +69,6 @@ class RegisterView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-<<<<<<< HEAD
-=======
         if requested_manager_access:
             return Response(
                 {
@@ -82,7 +80,6 @@ class RegisterView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
->>>>>>> c95c1840a9ddd2718dc5586949fa19c138dfd51e
         try:
             validate_profile_picture(profile_picture)
         except DRFValidationError as error:
@@ -134,11 +131,7 @@ class RegisterView(APIView):
                     user=user,
                     phone_number=phone,
                     role=Profile.ROLE_CITIZEN,
-<<<<<<< HEAD
-                    manager_access_requested=requested_manager_access,
-=======
                     manager_access_requested=False,
->>>>>>> c95c1840a9ddd2718dc5586949fa19c138dfd51e
                     profile_picture=profile_picture,
                 )
         except cloudinary.exceptions.Error:
@@ -147,21 +140,10 @@ class RegisterView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        message = 'Usuário cadastrado com sucesso.'
-        if requested_manager_access:
-            message = 'Cadastro realizado. O acesso de gestor aguarda aprovação.'
-
         return Response(
             {
-<<<<<<< HEAD
-                'message': message,
-                'manager_access_status': (
-                    'pending' if requested_manager_access else 'not_requested'
-                ),
-=======
                 'message': 'Usuário cadastrado com sucesso.',
                 'manager_access_status': 'not_requested',
->>>>>>> c95c1840a9ddd2718dc5586949fa19c138dfd51e
                 'user': {
                     'username': user.username,
                     'email': user.email,
@@ -227,6 +209,15 @@ class LoginView(APIView):
 
         profile = getattr(user, 'profile', None)
         role = profile.role if profile else Profile.ROLE_CITIZEN
+        profile_picture_url = None
+        if profile and profile.profile_picture:
+            try:
+                profile_picture_url = request.build_absolute_uri(
+                    profile.profile_picture.url
+                )
+            except (ValueError, AttributeError):
+                profile_picture_url = None
+
         permissions_data = {
             'controlAcess': bool(profile and profile.can_control_access),
             'announcement': bool(profile and profile.can_manage_announcements),
@@ -250,6 +241,8 @@ class LoginView(APIView):
                     'username': user.username,
                     'email': user.email,
                     'first_name': user.first_name,
+                    'foto': profile_picture_url,
+                    'fotoPerfil': profile_picture_url,
                     'is_staff': user.is_staff,
                     'is_superuser': user.is_superuser,
                     'role_code': role,

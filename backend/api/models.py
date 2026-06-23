@@ -303,6 +303,54 @@ class DeliveryLog(models.Model):
         return f'{self.announcement_id} - {self.status}'
 
 
+class ChatMessage(models.Model):
+    TYPE_TEXT = 'texto'
+    TYPE_AUDIO = 'audio'
+    TYPE_IMAGE = 'imagem'
+    TYPE_VIDEO = 'video'
+    TYPE_DOCUMENT = 'documento'
+    TYPE_CHOICES = [
+        (TYPE_TEXT, 'Texto'),
+        (TYPE_AUDIO, 'Áudio'),
+        (TYPE_IMAGE, 'Imagem'),
+        (TYPE_VIDEO, 'Vídeo'),
+        (TYPE_DOCUMENT, 'Documento'),
+    ]
+
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='sent_chat_messages',
+    )
+    receiver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='received_chat_messages',
+    )
+    text = models.TextField(blank=True)
+    message_type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default=TYPE_TEXT,
+    )
+    file = models.FileField(upload_to='chat/%Y/%m/', blank=True, null=True)
+    original_name = models.CharField(max_length=255, blank=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Mensagem de chat'
+        verbose_name_plural = 'Mensagens de chat'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['sender', 'receiver', 'created_at']),
+            models.Index(fields=['receiver', 'read_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.sender_id} -> {self.receiver_id} ({self.message_type})'
+
+
 class AuditLog(models.Model):
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,

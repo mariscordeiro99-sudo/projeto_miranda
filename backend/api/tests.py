@@ -72,7 +72,7 @@ class RegisterViewTests(APITestCase):
     def tearDown(self):
         rmtree(self.media_root, ignore_errors=True)
 
-    def test_public_register_creates_pending_manager_request(self):
+    def test_public_register_cannot_create_manager(self):
         response = self.client.post(
             '/auth/register/',
             {
@@ -86,13 +86,8 @@ class RegisterViewTests(APITestCase):
             format='json',
         )
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['manager_access_status'], 'pending')
-
-        user = User.objects.get(username='gestor_publico')
-        self.assertFalse(user.is_staff)
-        self.assertEqual(user.profile.role, Profile.ROLE_CITIZEN)
-        self.assertTrue(user.profile.manager_access_requested)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(User.objects.filter(username='gestor_publico').exists())
 
     def test_public_register_creates_citizen(self):
         response = self.client.post(
@@ -2132,6 +2127,16 @@ class DashboardReportTests(APITestCase):
         self.assertEqual(len(response.data['recent_views']), 1)
         self.assertEqual(response.data['recent_views'][0]['recipient'], 'cidadao_relatorio')
         self.assertEqual(response.data['recent_views'][0]['announcement'], self.published.title)
+
+    def test_dashboard_metrics_returns_frontend_shape_for_admin(self):
+        self.authenticate_as(self.staff_user)
+
+        response = self.client.get('/api/dashboard/metrics/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['usuariosAtivos'], 2)
+        self.assertEqual(response.data['mensagensEnviadas'], 2)
+        self.assertEqual(response.data['taxaVisualizacao'], '25%')
 
     def test_dashboard_report_uses_bounded_query_count(self):
         with CaptureQueriesContext(connection) as queries:

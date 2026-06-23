@@ -22,8 +22,15 @@ from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from api import admin_report_views
+from api.chat_views import (
+    ChatContactsView,
+    ChatMarkReadView,
+    ChatMessagesView,
+    ChatSendView,
+    ChatUploadView,
+)
 from api.health import DetailedHealthCheckView, HealthCheckView
-from api.views import UserPermissionsView
+from api.views import AdminAnnouncementsView, DashboardMetricsView, FrontendAnnouncementsView, UserPermissionsView
 
 urlpatterns = [
     path('', lambda request: redirect('admin/')), 
@@ -33,8 +40,25 @@ urlpatterns = [
     path('admin/reports/delivery-failures/', admin_report_views.failed_deliveries_report, name='admin-report-delivery-failures'),
     path('admin/users-permissions/', UserPermissionsView.as_view(), name='user-permissions-list'),
     path('admin/users-permissions/<int:user_id>/', UserPermissionsView.as_view(), name='user-permissions-detail'),
+    path('admin/announcements/', AdminAnnouncementsView.as_view(), name='admin-announcements-list'),
+    path('admin/announcements', AdminAnnouncementsView.as_view(), name='admin-announcements-list-noslash'),
+    path('admin/announcements/<int:announcement_id>/', AdminAnnouncementsView.as_view(), name='admin-announcements-detail'),
+    path('admin/announcements/<int:announcement_id>', AdminAnnouncementsView.as_view(), name='admin-announcements-detail-noslash'),
     path('admin/', admin.site.urls),
     path('auth/', include('api.auth_urls')),
+    path('announcements/', FrontendAnnouncementsView.as_view(), name='frontend-announcements-root-slash'),
+    path('announcements', FrontendAnnouncementsView.as_view(), name='frontend-announcements-root'),
+    path('dashboard/metrics/', DashboardMetricsView.as_view(), name='dashboard-metrics-root'),
+    path('chat/contatos', ChatContactsView.as_view(), name='chat-contacts-root'),
+    path('chat/contatos/', ChatContactsView.as_view(), name='chat-contacts-root-slash'),
+    path('chat/contatos/<int:contact_id>/ler', ChatMarkReadView.as_view(), name='chat-mark-read-root'),
+    path('chat/contatos/<int:contact_id>/ler/', ChatMarkReadView.as_view(), name='chat-mark-read-root-slash'),
+    path('chat/mensagens/<int:contact_id>', ChatMessagesView.as_view(), name='chat-messages-root'),
+    path('chat/mensagens/<int:contact_id>/', ChatMessagesView.as_view(), name='chat-messages-root-slash'),
+    path('chat/enviar', ChatSendView.as_view(), name='chat-send-root'),
+    path('chat/enviar/', ChatSendView.as_view(), name='chat-send-root-slash'),
+    path('chat/upload', ChatUploadView.as_view(), name='chat-upload-root'),
+    path('chat/upload/', ChatUploadView.as_view(), name='chat-upload-root-slash'),
     path('health/', HealthCheckView.as_view(), name='health'),
     path('health/detailed/', DetailedHealthCheckView.as_view(), name='health-detailed'),
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
