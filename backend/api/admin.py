@@ -267,6 +267,24 @@ class ProfileAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
     list_filter = ('role', 'manager_access_requested')
     search_fields = ('user__username', 'user__email', 'phone_number')
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        field_labels = {
+            'user': 'Usuário',
+            'phone_number': 'Telefone',
+            'role': 'Função',
+            'manager_access_requested': 'Acesso de gestor solicitado',
+            'can_control_access': 'Pode controlar acessos',
+            'can_manage_announcements': 'Pode gerenciar comunicados',
+            'can_manage_visual_identity': 'Pode gerenciar identidade visual',
+            'can_view_manager_dashboard': 'Pode visualizar o painel do gestor',
+            'profile_picture': 'Foto de perfil',
+        }
+        for field_name, label in field_labels.items():
+            if field_name in form.base_fields:
+                form.base_fields[field_name].label = label
+        return form
+
 
 @admin.register(Institution)
 class InstitutionAdmin(AuditedAdminMixin, NoDeleteAdminMixin, admin.ModelAdmin):
