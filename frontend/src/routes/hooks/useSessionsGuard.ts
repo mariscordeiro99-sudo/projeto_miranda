@@ -8,7 +8,7 @@ export const useSessionGuard = () => {
 
   const shouldRequireLogin = (): boolean => {
     const token = localStorage.getItem('auth_token');
-    const storedUser = localStorage.getItem('user_data');
+    const storedUser = localStorage.getItem('user') || localStorage.getItem('user_data');
     const lastAccess = localStorage.getItem(SESSION_KEY);
 
     if (!token || !storedUser) {

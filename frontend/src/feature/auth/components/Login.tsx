@@ -22,8 +22,17 @@ const Login: React.FC = () => {
     e.preventDefault();
     try {
       const response = await authService.login({ identificador: loginId, senha: password });
+      const userData = response.data.user;
+
       localStorage.setItem('auth_token', response.data.access_token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('user_data', JSON.stringify(userData));
+      localStorage.setItem('@App:last_access', Date.now().toString());
+
+      if (userData?.id && userData?.permissoes) {
+        localStorage.setItem(`permissoes_${userData.id}`, JSON.stringify(userData.permissoes));
+      }
+
       console.log('Sucesso:', response.data);
       navigate(AppRoutes.LOGIN_SUCCESS);
     } catch (error) {
