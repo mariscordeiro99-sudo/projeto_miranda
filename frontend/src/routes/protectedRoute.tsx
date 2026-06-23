@@ -6,7 +6,7 @@ import { AppRoutes } from './types/loginReg';
 export const ProtectedRoute: React.FC = () => {
   const location = useLocation();
   const token = localStorage.getItem('auth_token');
-  const storedUser = localStorage.getItem('user_data');
+  const storedUser = localStorage.getItem('user');
 
   if (!token || !storedUser) {
     return <Navigate to={AppRoutes.LOGIN} replace />;
