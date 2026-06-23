@@ -209,6 +209,10 @@ class ManagerTokenPolicyTests(APITestCase):
         self.assertNotEqual(response.data['token'], old_token.key)
         self.assertFalse(Token.objects.filter(key=old_token.key).exists())
         self.assertTrue(Token.objects.filter(key=response.data['token']).exists())
+        self.assertEqual(response.data['user']['id'], self.manager_user.id)
+        self.assertEqual(response.data['user']['role'], 'gestor')
+        self.assertEqual(response.data['user']['role_code'], Profile.ROLE_MANAGER)
+        self.assertIn('permissoes', response.data['user'])
 
     @override_settings(MANAGER_TOKEN_TTL_SECONDS=60)
     def test_expired_manager_token_is_rejected_and_revoked(self):
@@ -274,6 +278,174 @@ class ManagerTokenPolicyTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(Token.objects.filter(key=token.key).exists())
+
+
+class UserPermissionsFlowTests(APITestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            username='admin_acessos',
+            email='admin_acessos@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=self.admin_user,
+            role=Profile.ROLE_MANAGER,
+            can_control_access=True,
+            can_manage_announcements=True,
+            can_manage_visual_identity=True,
+            can_view_manager_dashboard=True,
+        )
+        self.pending_user = User.objects.create_user(
+            username='gestor_pendente',
+            email='gestor_pendente@example.com',
+            password='SenhaForte123',
+        )
+        Profile.objects.create(
+            user=self.pending_user,
+            role=Profile.ROLE_CITIZEN,
+            manager_access_requested=True,
+        )
+
+    def authenticate_as_admin(self):
+        token = Token.objects.create(user=self.admin_user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    def test_access_control_list_requires_staff_user(self):
+        anonymous_response = self.client.get('/admin/users-permissions/')
+        self.assertEqual(
+            anonymous_response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+        citizen_token = Token.objects.create(user=self.pending_user)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {citizen_token.key}'
+        )
+        citizen_response = self.client.get('/admin/users-permissions/')
+        self.assertEqual(
+            citizen_response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+        manager_without_permission = User.objects.create_user(
+            username='gestor_sem_controle',
+            email='gestor_sem_controle@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=manager_without_permission,
+            role=Profile.ROLE_MANAGER,
+            can_view_manager_dashboard=True,
+        )
+        manager_token = Token.objects.create(user=manager_without_permission)
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {manager_token.key}'
+        )
+        manager_response = self.client.get('/admin/users-permissions/')
+        self.assertEqual(
+            manager_response.status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_admin_can_list_pending_manager_requests(self):
+        self.authenticate_as_admin()
+
+        response = self.client.get('/admin/users-permissions/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        pending_data = next(
+            item
+            for item in response.data
+            if item['id'] == str(self.pending_user.id)
+        )
+        self.assertTrue(pending_data['managerAccessRequested'])
+        self.assertEqual(pending_data['roleAtual'], 'colaborador')
+
+    def test_admin_can_approve_manager_permissions(self):
+        self.authenticate_as_admin()
+
+        response = self.client.put(
+            f'/admin/users-permissions/{self.pending_user.id}/',
+            {
+                'roleAtual': 'gestor',
+                'permissoes': {
+                    'controlAcess': True,
+                    'announcement': True,
+                    'idtVisual': False,
+                    'dashboardGestor': True,
+                    'isAdmin': False,
+                },
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.pending_user.refresh_from_db()
+        self.pending_user.profile.refresh_from_db()
+        self.assertTrue(self.pending_user.is_staff)
+        self.assertEqual(
+            self.pending_user.profile.role,
+            Profile.ROLE_MANAGER,
+        )
+        self.assertFalse(
+            self.pending_user.profile.manager_access_requested
+        )
+        self.assertTrue(self.pending_user.profile.can_control_access)
+        self.assertTrue(
+            self.pending_user.profile.can_manage_announcements
+        )
+        self.assertFalse(
+            self.pending_user.profile.can_manage_visual_identity
+        )
+        self.assertTrue(
+            self.pending_user.profile.can_view_manager_dashboard
+        )
+        self.assertTrue(
+            AuditLog.objects.filter(
+                actor=self.admin_user,
+                action='user_access_permissions_updated',
+                target_id=str(self.pending_user.id),
+            ).exists()
+        )
+
+    def test_admin_can_revoke_manager_permissions_and_token(self):
+        self.pending_user.is_staff = True
+        self.pending_user.save(update_fields=['is_staff'])
+        profile = self.pending_user.profile
+        profile.role = Profile.ROLE_MANAGER
+        profile.can_view_manager_dashboard = True
+        profile.save()
+        manager_token = Token.objects.create(user=self.pending_user)
+        self.authenticate_as_admin()
+
+        response = self.client.put(
+            f'/admin/users-permissions/{self.pending_user.id}/',
+            {
+                'roleAtual': 'colaborador',
+                'permissoes': {
+                    'controlAcess': False,
+                    'announcement': False,
+                    'idtVisual': False,
+                    'dashboardGestor': False,
+                    'isAdmin': False,
+                },
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.pending_user.refresh_from_db()
+        self.pending_user.profile.refresh_from_db()
+        self.assertFalse(self.pending_user.is_staff)
+        self.assertEqual(
+            self.pending_user.profile.role,
+            Profile.ROLE_CITIZEN,
+        )
+        self.assertFalse(
+            Token.objects.filter(key=manager_token.key).exists()
+        )
 
 
 class ManagerManagementTests(APITestCase):
@@ -349,6 +521,10 @@ class ManagerManagementTests(APITestCase):
         self.assertTrue(manager.is_active)
         self.assertEqual(manager.profile.role, Profile.ROLE_MANAGER)
         self.assertEqual(manager.profile.phone_number, '51944444444')
+        self.assertTrue(manager.profile.can_control_access)
+        self.assertTrue(manager.profile.can_manage_announcements)
+        self.assertTrue(manager.profile.can_manage_visual_identity)
+        self.assertTrue(manager.profile.can_view_manager_dashboard)
         self.assertTrue(
             AuditLog.objects.filter(
                 actor=self.admin_user,
@@ -377,6 +553,10 @@ class ManagerManagementTests(APITestCase):
         self.assertEqual(manager.profile.phone_number, '51955555555')
         self.assertTrue(manager.is_staff)
         self.assertEqual(manager.profile.role, Profile.ROLE_MANAGER)
+        self.assertTrue(manager.profile.can_control_access)
+        self.assertTrue(manager.profile.can_manage_announcements)
+        self.assertTrue(manager.profile.can_manage_visual_identity)
+        self.assertTrue(manager.profile.can_view_manager_dashboard)
 
     def test_admin_can_deactivate_and_reactivate_manager(self):
         manager = self.create_manager()
@@ -408,6 +588,10 @@ class ManagerManagementTests(APITestCase):
         self.assertFalse(manager.is_staff)
         self.assertTrue(manager.is_active)
         self.assertEqual(manager.profile.role, Profile.ROLE_CITIZEN)
+        self.assertFalse(manager.profile.can_control_access)
+        self.assertFalse(manager.profile.can_manage_announcements)
+        self.assertFalse(manager.profile.can_manage_visual_identity)
+        self.assertFalse(manager.profile.can_view_manager_dashboard)
         self.assertFalse(Token.objects.filter(key=manager_token.key).exists())
 
     def test_admin_cannot_deactivate_or_revoke_self(self):

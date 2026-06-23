@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -49,6 +50,22 @@ class IsManagerOrReadOnly(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
         return bool(request.user and request.user.is_authenticated and request.user.is_staff)
+
+
+class CanControlAccess(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+
+        profile = getattr(user, 'profile', None)
+        return bool(
+            user.is_staff
+            and profile
+            and profile.can_control_access
+        )
 
 
 class NoDestroyModelViewSet(viewsets.ModelViewSet):
@@ -114,6 +131,138 @@ class HelloView(APIView):
             'status': 'healthy',
             'version': '1.0.0',
         })
+
+
+class UserPermissionsView(APIView):
+    permission_classes = [CanControlAccess]
+
+    permission_fields = {
+        'controlAcess': 'can_control_access',
+        'announcement': 'can_manage_announcements',
+        'idtVisual': 'can_manage_visual_identity',
+        'dashboardGestor': 'can_view_manager_dashboard',
+    }
+
+    def serialize_user(self, request, user):
+        profile = getattr(user, 'profile', None)
+        permission_values = {
+            api_name: bool(profile and getattr(profile, model_name))
+            for api_name, model_name in self.permission_fields.items()
+        }
+        permission_values['isAdmin'] = all(permission_values.values())
+
+        photo_url = None
+        if profile and profile.profile_picture:
+            try:
+                photo_url = request.build_absolute_uri(profile.profile_picture.url)
+            except (ValueError, AttributeError):
+                photo_url = None
+
+        is_manager = bool(
+            user.is_staff
+            or (profile and profile.role == Profile.ROLE_MANAGER)
+        )
+        return {
+            'id': str(user.id),
+            'nome': user.get_full_name() or user.username,
+            'email': user.email,
+            'foto': photo_url,
+            'roleAtual': 'gestor' if is_manager else 'colaborador',
+            'managerAccessRequested': bool(
+                profile and profile.manager_access_requested
+            ),
+            'permissoes': permission_values,
+        }
+
+    def get(self, request, user_id=None, *args, **kwargs):
+        queryset = (
+            User.objects
+            .select_related('profile')
+            .filter(is_active=True)
+            .order_by('first_name', 'username')
+        )
+        if user_id is not None:
+            user = queryset.filter(pk=user_id).first()
+            if user is None:
+                return Response(
+                    {'detail': 'Usuário não encontrado.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            return Response(self.serialize_user(request, user))
+
+        return Response([
+            self.serialize_user(request, user)
+            for user in queryset
+        ])
+
+    @transaction.atomic
+    def put(self, request, user_id=None, *args, **kwargs):
+        if user_id is None:
+            return Response(
+                {'detail': 'Informe o usuário que será atualizado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.select_for_update().filter(pk=user_id).first()
+        if user is None:
+            return Response(
+                {'detail': 'Usuário não encontrado.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        profile, _ = Profile.objects.select_for_update().get_or_create(user=user)
+        submitted_permissions = request.data.get('permissoes')
+        if not isinstance(submitted_permissions, dict):
+            return Response(
+                {'detail': 'O campo permissoes deve ser um objeto.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        grant_all = submitted_permissions.get('isAdmin') is True
+        for api_name, model_name in self.permission_fields.items():
+            value = grant_all or submitted_permissions.get(api_name) is True
+            setattr(profile, model_name, value)
+
+        has_manager_access = any(
+            getattr(profile, model_name)
+            for model_name in self.permission_fields.values()
+        )
+        requested_role = str(request.data.get('roleAtual', '')).lower()
+        has_manager_access = has_manager_access or requested_role == 'gestor'
+
+        profile.role = (
+            Profile.ROLE_MANAGER if has_manager_access else Profile.ROLE_CITIZEN
+        )
+        profile.manager_access_requested = False
+        profile.save(update_fields=[
+            'role',
+            'manager_access_requested',
+            *self.permission_fields.values(),
+            'updated_at',
+        ])
+
+        was_staff = user.is_staff
+        if not user.is_superuser:
+            user.is_staff = has_manager_access
+            user.save(update_fields=['is_staff'])
+
+        if was_staff and not user.is_staff:
+            Token.objects.filter(user=user).delete()
+
+        record_audit_log(
+            request.user,
+            'user_access_permissions_updated',
+            user,
+            {
+                'role': profile.role,
+                'permissions': {
+                    key: getattr(profile, field)
+                    for key, field in self.permission_fields.items()
+                },
+            },
+        )
+        user = User.objects.select_related('profile').get(pk=user.pk)
+        return Response(self.serialize_user(request, user))
 
 
 class DashboardReportView(APIView):
@@ -353,7 +502,20 @@ class ManagerViewSet(viewsets.ModelViewSet):
         manager.save(update_fields=['is_active', 'is_staff'])
         profile, _ = Profile.objects.get_or_create(user=manager)
         profile.role = Profile.ROLE_MANAGER
-        profile.save(update_fields=['role'])
+        profile.manager_access_requested = False
+        profile.can_control_access = True
+        profile.can_manage_announcements = True
+        profile.can_manage_visual_identity = True
+        profile.can_view_manager_dashboard = True
+        profile.save(update_fields=[
+            'role',
+            'manager_access_requested',
+            'can_control_access',
+            'can_manage_announcements',
+            'can_manage_visual_identity',
+            'can_view_manager_dashboard',
+            'updated_at',
+        ])
         record_audit_log(request.user, 'manager_reactivated', manager)
         return Response(self.get_serializer(manager).data)
 
@@ -372,7 +534,20 @@ class ManagerViewSet(viewsets.ModelViewSet):
 
         profile, _ = Profile.objects.get_or_create(user=manager)
         profile.role = Profile.ROLE_CITIZEN
-        profile.save(update_fields=['role'])
+        profile.manager_access_requested = False
+        profile.can_control_access = False
+        profile.can_manage_announcements = False
+        profile.can_manage_visual_identity = False
+        profile.can_view_manager_dashboard = False
+        profile.save(update_fields=[
+            'role',
+            'manager_access_requested',
+            'can_control_access',
+            'can_manage_announcements',
+            'can_manage_visual_identity',
+            'can_view_manager_dashboard',
+            'updated_at',
+        ])
         record_audit_log(request.user, 'manager_revoked', manager)
         return Response(self.get_serializer(manager).data)
 

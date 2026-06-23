@@ -48,6 +48,11 @@ class ProfileSerializer(serializers.ModelSerializer):
             'user',
             'phone_number',
             'role',
+            'manager_access_requested',
+            'can_control_access',
+            'can_manage_announcements',
+            'can_manage_visual_identity',
+            'can_view_manager_dashboard',
             'profile_picture',
             'created_at',
             'updated_at',
@@ -141,6 +146,11 @@ class ManagerSerializer(serializers.ModelSerializer):
             defaults={
                 'phone_number': phone_number,
                 'role': Profile.ROLE_MANAGER,
+                'manager_access_requested': False,
+                'can_control_access': True,
+                'can_manage_announcements': True,
+                'can_manage_visual_identity': True,
+                'can_view_manager_dashboard': True,
             },
         )
         return user
@@ -162,6 +172,11 @@ class ManagerSerializer(serializers.ModelSerializer):
         if phone_number is not None:
             profile.phone_number = phone_number
         profile.role = Profile.ROLE_MANAGER
+        profile.manager_access_requested = False
+        profile.can_control_access = True
+        profile.can_manage_announcements = True
+        profile.can_manage_visual_identity = True
+        profile.can_view_manager_dashboard = True
         profile.save()
         return instance
 
