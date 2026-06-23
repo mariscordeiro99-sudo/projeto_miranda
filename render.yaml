@@ -11,7 +11,7 @@ services:
     plan: free
     rootDir: .
     buildCommand: bash backend/build.sh
-    startCommand: cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: bash backend/start.sh
     healthCheckPath: /health/
     autoDeploy: true
     envVars:
