@@ -57,6 +57,12 @@ services:
         sync: false
       - key: CORS_ALLOW_ALL_ORIGINS
         value: "false"
+      - key: FRONTEND_URL
+        value: https://projeto-miranda-1wyn.onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://projeto-miranda-1wyn.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://projeto-miranda-1wyn.onrender.com
       - key: PUSH_DISPATCH_ON_PUBLISH
         value: "true"
       - key: PUSH_DISPATCH_ASYNC
