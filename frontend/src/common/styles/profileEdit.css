@@ -183,6 +183,57 @@
   margin: 0.5rem 0;
 }
 
+.password-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.password-hints span {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid transparent;
+}
+
+.password-hints span.invalid {
+  background-color: #fff1f2;
+  color: #ef4444;
+  border-color: #fee2e2;
+}
+
+.password-hints span.valid {
+  background-color: #ecfdf5;
+  color: #10b981;
+  border-color: #d1fae5;
+  transform: scale(1.02);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.08);
+}
+
+.password-hints span::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.password-hints span.invalid::before {
+  background-color: #ef4444;
+}
+
+.password-hints span.valid::before {
+  background-color: #10b981;
+}
+
 .btn-trigger-password {
   background-color: #f1f5f9;
   color: #334155;
@@ -199,7 +250,7 @@
   transition: background-color 0.2s;
 }
 
-.btn-trigger-password:hover {
+.btn-trigger-password:hover:not(:disabled) {
   background-color: #e2e8f0;
 }
 
@@ -225,12 +276,12 @@
   transition: background-color 0.2s;
 }
 
-.btn-save-profile:hover {
+.btn-save-profile:hover:not(:disabled) {
   background-color: #3152b1;
 }
 
 .btn-save-profile:disabled, .btn-trigger-password:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 

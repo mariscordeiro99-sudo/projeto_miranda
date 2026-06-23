@@ -12,3 +12,11 @@ export interface PasswordChangeState {
 }
 
 export type ProfileStep = 'FORMULARIO' | 'VERIFICACAO_CODIGO';
+
+export interface PasswordRules {
+  length: boolean;
+  upper: boolean;
+  lower: boolean;
+  number: boolean;
+  special: boolean;
+}

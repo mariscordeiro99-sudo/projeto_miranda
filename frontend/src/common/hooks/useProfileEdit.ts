@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import type { ChangeEvent } from 'react';
-import type { UserProfileData, PasswordChangeState, ProfileStep } from '../types/profileEdit';
+import type { UserProfileData, PasswordChangeState, ProfileStep, PasswordRules } from '../types/profileEdit';
 import type { ApiError } from '../types/apiError';
 import api from '../services/api';
 
@@ -9,7 +9,6 @@ interface UseProfileEditProps {
   onClose: () => void;
   initialData: { email: string; fotoUrl: string };
 }
-
 
 export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -28,6 +27,16 @@ export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditP
 
   const [step, setStep] = useState<ProfileStep>('FORMULARIO');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const rules: PasswordRules = {
+    length: passwordData.novaSenha.length >= 6 && passwordData.novaSenha.length <= 15,
+    upper: /[A-Z]/.test(passwordData.novaSenha),
+    lower: /[a-z]/.test(passwordData.novaSenha),
+    number: /[0-9]/.test(passwordData.novaSenha),
+    special: /[^A-Za-z0-9]/.test(passwordData.novaSenha),
+  };
+
+  const isPasswordValid = Object.values(rules).every(Boolean);
 
   const handleProfileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -59,6 +68,11 @@ export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditP
       return;
     }
 
+    if (!isPasswordValid) {
+      alert('A nova senha não atende aos requisitos.');
+      return;
+    }
+
     if (passwordData.novaSenha !== passwordData.confirmarNovaSenha) {
       alert('A nova senha e a confirmação não coincidem.');
       return;
@@ -75,10 +89,8 @@ export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditP
       alert(`Código de verificação enviado para o e-mail: ${profileData.email}`);
     } catch (error) {
       console.error('Erro ao solicitar troca de senha:', error);
-
       const apiError = error as ApiError;
       const mensagemErro = apiError.response?.data?.detail || 'Erro ao enviar código de verificação.';
-
       alert(mensagemErro);
     } finally {
       setIsLoading(false);
@@ -109,17 +121,14 @@ export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditP
         },
       });
 
-      alert('Perfil atualizado com sucesso!');
-
+      alert('Perfil updated com sucesso!');
       setStep('FORMULARIO');
       setPasswordData({ senhaAtual: '', novaSenha: '', confirmarNovaSenha: '', codigoVerificacao: '' });
       onClose();
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
-
       const apiError = error as ApiError;
       const mensagemErro = apiError.response?.data?.detail || 'Erro ao salvar as alterações do perfil.';
-
       alert(mensagemErro);
     } finally {
       setIsLoading(false);
@@ -135,6 +144,8 @@ export const useProfileEdit = ({ isOpen, onClose, initialData }: UseProfileEditP
     step,
     isLoading,
     fileInputRef,
+    rules,
+    isPasswordValid,
     handleProfileChange,
     handlePasswordChange,
     dispararSeletorFoto,

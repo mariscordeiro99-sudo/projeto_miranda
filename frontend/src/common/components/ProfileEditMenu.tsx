@@ -20,6 +20,8 @@ export const ProfileEditMenu: React.FC<ProfileEditMenuProps> = ({
     step,
     isLoading,
     fileInputRef,
+    rules,
+    isPasswordValid,
     handleProfileChange,
     handlePasswordChange,
     dispararSeletorFoto,
@@ -34,7 +36,7 @@ export const ProfileEditMenu: React.FC<ProfileEditMenuProps> = ({
   return (
     <div className="profile-menu-overlay" onClick={onClose}>
       <div className="profile-menu-panel" onClick={(e) => e.stopPropagation()}>
-        
+
         <header className="profile-menu-header">
           <div className="profile-menu-title">
             {step === 'VERIFICACAO_CODIGO' && (
@@ -52,24 +54,24 @@ export const ProfileEditMenu: React.FC<ProfileEditMenuProps> = ({
         <div className="profile-menu-body">
           {step === 'FORMULARIO' ? (
             <form onSubmit={(e) => e.preventDefault()} className="profile-menu-form">
-              
+
               <div className="profile-avatar-section">
                 <div className="profile-avatar-wrapper" onClick={dispararSeletorFoto}>
-                  <img 
-                    src={profileData.fotoUrl} 
-                    alt="Foto de Perfil" 
-                    className="profile-avatar-img" 
+                  <img
+                    src={profileData.fotoUrl}
+                    alt="Foto de Perfil"
+                    className="profile-avatar-img"
                   />
                   <div className="profile-avatar-hover">
                     <Camera size={20} color="#fff" />
                   </div>
                 </div>
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleMudarFoto} 
-                  accept="image/*" 
-                  style={{ display: 'none' }} 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleMudarFoto}
+                  accept="image/*"
+                  style={{ display: 'none' }}
                 />
                 <p className="avatar-hint">Clique na foto para alterar</p>
               </div>
@@ -92,7 +94,7 @@ export const ProfileEditMenu: React.FC<ProfileEditMenuProps> = ({
               <div className="profile-divider" />
 
               <h3 className="section-subtitle">Alterar Senha</h3>
-              
+
               <div className="profile-input-group">
                 <label htmlFor="senhaAtual">Senha Atual</label>
                 <div className="profile-input-wrapper">
@@ -118,9 +120,19 @@ export const ProfileEditMenu: React.FC<ProfileEditMenuProps> = ({
                     name="novaSenha"
                     value={passwordData.novaSenha}
                     onChange={handlePasswordChange}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Nova senha altamente segura"
                   />
                 </div>
+
+                {passwordData.novaSenha && (
+                  <div className="password-hints">
+                    <span className={rules.length ? 'valid' : 'invalid'}>6 a 15 caracteres</span>
+                    <span className={rules.upper ? 'valid' : 'invalid'}>Letra Maiúscula</span>
+                    <span className={rules.lower ? 'valid' : 'invalid'}>Letra Minúscula</span>
+                    <span className={rules.number ? 'valid' : 'invalid'}>Número</span>
+                    <span className={rules.special ? 'valid' : 'invalid'}>Caractere Especial</span>
+                  </div>
+                )}
               </div>
 
               <div className="profile-input-group">
@@ -138,19 +150,19 @@ export const ProfileEditMenu: React.FC<ProfileEditMenuProps> = ({
                 </div>
               </div>
 
-              <button 
-                type="button" 
-                className="btn-trigger-password" 
+              <button
+                type="button"
+                className="btn-trigger-password"
                 onClick={iniciarTrocaSenha}
-                disabled={isLoading}
+                disabled={isLoading || (passwordData.novaSenha.length > 0 && !isPasswordValid)}
               >
                 {isLoading ? <Loader2 className="spinner" size={18} /> : 'Validar e Alterar Senha'}
               </button>
 
               <div className="profile-footer-actions">
-                <button 
-                  type="button" 
-                  className="btn-save-profile" 
+                <button
+                  type="button"
+                  className="btn-save-profile"
                   onClick={salvarAlteracoesPerfil}
                   disabled={isLoading}
                 >
@@ -164,10 +176,10 @@ export const ProfileEditMenu: React.FC<ProfileEditMenuProps> = ({
               <div className="verification-icon-wrapper">
                 <ShieldCheck size={48} color="#4169E1" />
               </div>
-              
+
               <h3>Código de Segurança</h3>
               <p className="verification-description">
-                Enviamos um token de verificação para o e-mail <strong>{profileData.email}</strong>. 
+                Enviamos um token de verificação para o e-mail <strong>{profileData.email}</strong>.
                 Insira o código abaixo para validar a troca de senha.
               </p>
 
