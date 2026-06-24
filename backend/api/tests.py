@@ -981,9 +981,9 @@ class VideoCompressionTests(APITestCase):
     )
     def test_video_is_converted_to_optimized_mp4(self):
         uploaded_file = SimpleUploadedFile(
-            'video-original.mov',
+            'video-original.mp4',
             mp4_file_with_duration(30),
-            content_type='video/quicktime',
+            content_type='video/mp4',
         )
 
         def fake_ffmpeg(command, **kwargs):
@@ -1083,7 +1083,7 @@ class AttachmentUploadAPITests(APITestCase):
             content_type='image/png',
         )
 
-    def test_staff_can_upload_pdf_word_docx_and_image_with_announcement(self):
+    def test_staff_can_upload_pdf_and_image_with_announcement(self):
         self.authenticate_as_staff()
 
         with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
@@ -1099,16 +1099,6 @@ class AttachmentUploadAPITests(APITestCase):
                             b'%PDF-1.4\n',
                             content_type='application/pdf',
                         ),
-                        SimpleUploadedFile(
-                            'oficio.doc',
-                            b'DOC',
-                            content_type='application/msword',
-                        ),
-                        SimpleUploadedFile(
-                            'ata.docx',
-                            b'DOCX',
-                            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                        ),
                         self.png_file(),
                     ],
                 },
@@ -1118,13 +1108,34 @@ class AttachmentUploadAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         announcement = Announcement.objects.get(id=response.data['id'])
         attachments = list(announcement.attachments.order_by('original_name'))
-        self.assertEqual(len(attachments), 4)
+        self.assertEqual(len(attachments), 2)
 
         file_types = {attachment.original_name: attachment.file_type for attachment in attachments}
-        self.assertEqual(file_types['ata.docx'], Attachment.TYPE_DOCUMENT)
         self.assertEqual(file_types['edital.pdf'], Attachment.TYPE_DOCUMENT)
-        self.assertEqual(file_types['oficio.doc'], Attachment.TYPE_DOCUMENT)
         self.assertEqual(file_types['imagem.png'], Attachment.TYPE_IMAGE)
+
+    def test_backend_blocks_attachment_types_not_allowed_by_frontend(self):
+        self.authenticate_as_staff()
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            response = self.client.post(
+                '/api/announcements/',
+                {
+                    'title': 'Comunicado com anexo invalido',
+                    'content': 'Conteudo com arquivo nao permitido.',
+                    'status': Announcement.STATUS_DRAFT,
+                    'attachments': [
+                        SimpleUploadedFile(
+                            'oficio.doc',
+                            b'DOC',
+                            content_type='application/msword',
+                        ),
+                    ],
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_attachment_endpoint_classifies_single_image_upload(self):
         self.authenticate_as_staff()
@@ -1173,9 +1184,9 @@ class AttachmentUploadAPITests(APITestCase):
                 {
                     'announcement': announcement.id,
                     'file': SimpleUploadedFile(
-                        'video-institucional.mov',
+                        'video-institucional.mp4',
                         mp4_file_with_duration(30),
-                        content_type='video/quicktime',
+                        content_type='video/mp4',
                     ),
                 },
                 format='multipart',

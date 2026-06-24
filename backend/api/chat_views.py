@@ -1,6 +1,3 @@
-import logging
-
-from cloudinary.utils import cloudinary_url
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.utils import timezone
@@ -9,10 +6,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import ChatMessage, Profile
-from .storage import _split_name
 
 
-logger = logging.getLogger(__name__)
 FRONTEND_CURRENT_USER_ID = 'user-logado-123'
 MAX_CHAT_FILE_SIZE = 50 * 1024 * 1024
 ALLOWED_CHAT_CONTENT_TYPES = {
@@ -87,24 +82,8 @@ def file_url(request, file_field):
     except (AttributeError, ValueError):
         return None
 
+
 def file_download_url(request, file_field):
-    """Return a URL that asks Cloudinary/browser to download the file."""
-    if not file_field:
-        return None
-
-    try:
-        resource_type, public_id, file_format = _split_name(file_field.name)
-        url, _ = cloudinary_url(
-            public_id,
-            resource_type=resource_type,
-            format=file_format or None,
-            secure=True,
-            flags='attachment',
-        )
-        return url
-    except Exception as exc:  # pragma: no cover - fallback for non Cloudinary storage
-        logger.debug('Não foi possível gerar URL de download do chat: %s', exc)
-
     return file_url(request, file_field)
 
 def user_photo_url(request, user):

@@ -28,14 +28,9 @@ ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = {
 }
 ALLOWED_ATTACHMENT_CONTENT_TYPES = {
     'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'image/jpeg',
     'image/png',
-    'image/webp',
     'video/mp4',
-    'video/quicktime',
-    'video/webm',
 }
 
 
@@ -45,11 +40,7 @@ def attachment_type(uploaded_file):
         return Attachment.TYPE_IMAGE
     if content_type.startswith('video/'):
         return Attachment.TYPE_VIDEO
-    if content_type in {
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    }:
+    if content_type == 'application/pdf':
         return Attachment.TYPE_DOCUMENT
     return Attachment.TYPE_OTHER
 
