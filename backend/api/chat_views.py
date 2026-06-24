@@ -1,3 +1,6 @@
+import logging
+
+from cloudinary.utils import cloudinary_url
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.utils import timezone
@@ -6,8 +9,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import ChatMessage, Profile
+from .storage import _split_name
 
 
+logger = logging.getLogger(__name__)
 FRONTEND_CURRENT_USER_ID = 'user-logado-123'
 MAX_CHAT_FILE_SIZE = 50 * 1024 * 1024
 ALLOWED_CHAT_CONTENT_TYPES = {
@@ -36,14 +41,43 @@ def user_display_name(user):
     return full_name or user.username
 
 
-def user_role(user):
+def is_manager_user(user):
     profile = getattr(user, 'profile', None)
-    if user.is_staff or user.is_superuser or (
-        profile and profile.role == Profile.ROLE_MANAGER
-    ):
-        return 'gestor'
-    return 'colaborador'
+    return bool(
+        user.is_staff
+        or user.is_superuser
+        or (profile and profile.role == Profile.ROLE_MANAGER)
+    )
 
+
+def user_role(user):
+    return 'gestor' if is_manager_user(user) else 'colaborador'
+
+
+def allowed_chat_contacts_for(user):
+    queryset = (
+        User.objects
+        .select_related('profile')
+        .filter(is_active=True)
+        .exclude(id=user.id)
+        .order_by('first_name', 'username')
+    )
+
+    if is_manager_user(user):
+        return queryset
+
+    return queryset.filter(
+        Q(is_staff=True)
+        | Q(is_superuser=True)
+        | Q(profile__role=Profile.ROLE_MANAGER)
+    ).distinct()
+
+
+def can_chat_with(current_user, contact):
+    if not contact or not contact.is_active or contact.id == current_user.id:
+        return False
+
+    return is_manager_user(current_user) or is_manager_user(contact)
 
 def file_url(request, file_field):
     if not file_field:
@@ -53,6 +87,25 @@ def file_url(request, file_field):
     except (AttributeError, ValueError):
         return None
 
+def file_download_url(request, file_field):
+    """Return a URL that asks Cloudinary/browser to download the file."""
+    if not file_field:
+        return None
+
+    try:
+        resource_type, public_id, file_format = _split_name(file_field.name)
+        url, _ = cloudinary_url(
+            public_id,
+            resource_type=resource_type,
+            format=file_format or None,
+            secure=True,
+            flags='attachment',
+        )
+        return url
+    except Exception as exc:  # pragma: no cover - fallback for non Cloudinary storage
+        logger.debug('Não foi possível gerar URL de download do chat: %s', exc)
+
+    return file_url(request, file_field)
 
 def user_photo_url(request, user):
     profile = getattr(user, 'profile', None)
@@ -111,8 +164,14 @@ def serialize_message(request, message):
     }
 
     media_url = file_url(request, message.file)
+    download_url = file_download_url(request, message.file)
     if media_url:
-        data['midiaUrl'] = media_url
+        data['midiaUrl'] = (
+            download_url
+            if message.message_type == ChatMessage.TYPE_DOCUMENT and download_url
+            else media_url
+        )
+        data['downloadUrl'] = download_url or media_url
     if message.original_name:
         data['nomeArquivo'] = message.original_name
 
@@ -125,7 +184,7 @@ def get_contact(user_id, current_user):
     except (TypeError, ValueError):
         return None
 
-    return (
+    contact = (
         User.objects
         .select_related('profile')
         .filter(id=contact_id, is_active=True)
@@ -133,6 +192,10 @@ def get_contact(user_id, current_user):
         .first()
     )
 
+    if not can_chat_with(current_user, contact):
+        return None
+
+    return contact
 
 def infer_message_type(uploaded_file):
     content_type = getattr(uploaded_file, 'content_type', '') or ''
@@ -149,13 +212,7 @@ class ChatContactsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        contacts = (
-            User.objects
-            .select_related('profile')
-            .filter(is_active=True)
-            .exclude(id=request.user.id)
-            .order_by('first_name', 'username')
-        )
+        contacts = allowed_chat_contacts_for(request.user)
 
         response_data = []
         for contact in contacts:

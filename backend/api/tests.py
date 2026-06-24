@@ -29,6 +29,7 @@ from .models import (
     Announcement,
     Attachment,
     AuditLog,
+    ChatMessage,
     DeliveryLog,
     Institution,
     PrivacyRequest,
@@ -2465,3 +2466,98 @@ class AdminDashboardTests(APITestCase):
                 target_id=str(test_user.id),
             ).exists()
         )
+
+class ChatAccessRulesTests(APITestCase):
+    def setUp(self):
+        self.manager_user = User.objects.create_user(
+            username='gestor_chat',
+            email='gestor.chat@example.com',
+            password='Senha@123',
+            first_name='Gestor Chat',
+        )
+        Profile.objects.create(
+            user=self.manager_user,
+            role=Profile.ROLE_MANAGER,
+            can_view_manager_dashboard=True,
+        )
+        self.citizen_a = User.objects.create_user(
+            username='cidadao_a_chat',
+            email='cidadao.a.chat@example.com',
+            password='Senha@123',
+            first_name='Cidadão A',
+        )
+        Profile.objects.create(user=self.citizen_a, role=Profile.ROLE_CITIZEN)
+        self.citizen_b = User.objects.create_user(
+            username='cidadao_b_chat',
+            email='cidadao.b.chat@example.com',
+            password='Senha@123',
+            first_name='Cidadão B',
+        )
+        Profile.objects.create(user=self.citizen_b, role=Profile.ROLE_CITIZEN)
+
+    def authenticate_as(self, user):
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    def test_citizen_only_lists_managers_as_chat_contacts(self):
+        self.authenticate_as(self.citizen_a)
+
+        response = self.client.get('/chat/contatos')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        contact_ids = {item['id'] for item in response.data}
+        self.assertIn(str(self.manager_user.id), contact_ids)
+        self.assertNotIn(str(self.citizen_b.id), contact_ids)
+
+    def test_citizen_cannot_open_or_send_to_another_citizen(self):
+        ChatMessage.objects.create(
+            sender=self.citizen_b,
+            receiver=self.citizen_a,
+            text='Mensagem que não deve ficar acessível entre cidadãos.',
+        )
+        self.authenticate_as(self.citizen_a)
+
+        history_response = self.client.get(f'/chat/mensagens/{self.citizen_b.id}')
+        send_response = self.client.post(
+            '/chat/enviar',
+            {
+                'receiverId': str(self.citizen_b.id),
+                'texto': 'Tentativa bloqueada',
+                'tipo': 'texto',
+            },
+            format='json',
+        )
+
+        self.assertEqual(history_response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(send_response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_citizen_can_send_to_manager_and_manager_can_read(self):
+        self.authenticate_as(self.citizen_a)
+        send_response = self.client.post(
+            '/chat/enviar',
+            {
+                'receiverId': str(self.manager_user.id),
+                'texto': 'Olá gestor',
+                'tipo': 'texto',
+            },
+            format='json',
+        )
+        self.assertEqual(send_response.status_code, status.HTTP_201_CREATED)
+
+        self.client.credentials()
+        self.authenticate_as(self.manager_user)
+        history_response = self.client.get(f'/chat/mensagens/{self.citizen_a.id}')
+
+        self.assertEqual(history_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(history_response.data), 1)
+        self.assertEqual(history_response.data[0]['texto'], 'Olá gestor')
+
+    def test_manager_lists_citizens_as_chat_contacts(self):
+        self.authenticate_as(self.manager_user)
+
+        response = self.client.get('/chat/contatos')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        contact_ids = {item['id'] for item in response.data}
+        self.assertIn(str(self.citizen_a.id), contact_ids)
+        self.assertIn(str(self.citizen_b.id), contact_ids)
