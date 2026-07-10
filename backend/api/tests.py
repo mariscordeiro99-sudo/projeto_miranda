@@ -36,6 +36,7 @@ from .models import (
     Profile,
     PushDevice,
     Segment,
+    VisualIdentity,
 )
 from .media_processing import prepare_attachment
 from .media_validation import MAX_VIDEO_SOURCE_SIZE, validate_attachment
@@ -1256,6 +1257,141 @@ class AttachmentUploadAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(Announcement.objects.filter(title='Comunicado invalido').exists())
         self.assertFalse(Attachment.objects.filter(original_name='malware.exe').exists())
+
+
+class FrontendVisualIdentityAPITests(APITestCase):
+    def setUp(self):
+        self.media_root = tempfile.mkdtemp()
+        self.test_storages = {
+            'default': {
+                'BACKEND': 'django.core.files.storage.FileSystemStorage',
+            },
+            'staticfiles': {
+                'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+            },
+        }
+        self.institution = Institution.objects.create(name='Prefeitura Teste')
+        self.staff_user = User.objects.create_user(
+            username='gestor_identidade',
+            email='gestor_identidade@example.com',
+            password='SenhaForte123',
+            is_staff=True,
+        )
+        Profile.objects.create(
+            user=self.staff_user,
+            phone_number='51933333333',
+            role=Profile.ROLE_MANAGER,
+            can_manage_visual_identity=True,
+        )
+        self.citizen_user = User.objects.create_user(
+            username='cidadao_identidade',
+            email='cidadao_identidade@example.com',
+            password='SenhaForte123',
+        )
+        Profile.objects.create(
+            user=self.citizen_user,
+            phone_number='51944444444',
+            role=Profile.ROLE_CITIZEN,
+        )
+
+    def tearDown(self):
+        rmtree(self.media_root, ignore_errors=True)
+
+    def authenticate_as(self, user):
+        token = Token.objects.create(user=user)
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token.key}')
+
+    def png_file(self, name='brasao.png'):
+        return SimpleUploadedFile(
+            name,
+            (
+                b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR'
+                b'\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06'
+                b'\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDAT'
+                b'x\x9cc\xf8\xcfP\x0f\x00\x03\x86\x01\x80Z4}k'
+                b'\x00\x00\x00\x00IEND\xaeB`\x82'
+            ),
+            content_type='image/png',
+        )
+
+    def test_frontend_update_endpoint_persists_brasao_in_database(self):
+        self.authenticate_as(self.staff_user)
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            response = self.client.put(
+                '/api/instituicao/identidade-visual/atualizar/',
+                {'brasao': self.png_file()},
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        visual_identity = VisualIdentity.objects.get(institution=self.institution)
+        self.assertTrue(visual_identity.coat_of_arms.name.startswith('identity/coat_of_arms/'))
+        self.assertTrue(visual_identity.coat_of_arms.name.endswith('.png'))
+        self.assertIn('/media/identity/coat_of_arms/', response.data['brasao_url'])
+        self.assertEqual(response.data['nome_arquivo'], 'brasao.png')
+
+    def test_frontend_get_endpoint_returns_saved_brasao(self):
+        self.authenticate_as(self.staff_user)
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            visual_identity = VisualIdentity.objects.create(institution=self.institution)
+            visual_identity.coat_of_arms.save('brasao-atual.png', self.png_file('brasao-atual.png'))
+
+            response = self.client.get('/instituicao/identidade-visual/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('/media/identity/coat_of_arms/', response.data['brasao_url'])
+        self.assertEqual(response.data['nome_arquivo'], 'brasao-atual.png')
+
+    def test_login_response_includes_saved_brasao_url(self):
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            visual_identity = VisualIdentity.objects.create(institution=self.institution)
+            visual_identity.coat_of_arms.save('brasao-login.png', self.png_file('brasao-login.png'))
+
+            response = self.client.post(
+                '/auth/login/',
+                {
+                    'username': self.staff_user.username,
+                    'password': 'SenhaForte123',
+                },
+                format='json',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('/media/identity/coat_of_arms/', response.data['user']['brasaoUrl'])
+        self.assertEqual(response.data['user']['brasao'], response.data['user']['brasaoUrl'])
+
+    def test_visual_identity_update_rejects_non_image_file(self):
+        self.authenticate_as(self.staff_user)
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            response = self.client.put(
+                '/api/instituicao/identidade-visual/atualizar/',
+                {
+                    'brasao': SimpleUploadedFile(
+                        'brasao.txt',
+                        b'not an image',
+                        content_type='text/plain',
+                    ),
+                },
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(VisualIdentity.objects.filter(coat_of_arms__gt='').exists())
+
+    def test_visual_identity_update_requires_manager_permission(self):
+        self.authenticate_as(self.citizen_user)
+
+        with override_settings(MEDIA_ROOT=self.media_root, STORAGES=self.test_storages):
+            response = self.client.put(
+                '/api/instituicao/identidade-visual/atualizar/',
+                {'brasao': self.png_file()},
+                format='multipart',
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class PublicDataExposureTests(APITestCase):

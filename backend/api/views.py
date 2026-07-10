@@ -25,7 +25,7 @@ from .models import (
     VisualIdentity,
 )
 from .media_processing import prepare_attachment
-from .media_validation import attachment_type
+from .media_validation import attachment_type, validate_visual_identity_image
 from .privacy import process_privacy_request
 from .reports import build_dashboard_report
 from .serializers import (
@@ -98,6 +98,23 @@ class CanManageAnnouncements(permissions.BasePermission):
             and profile.role == Profile.ROLE_MANAGER
             and profile.can_manage_announcements
         )
+
+
+class CanManageVisualIdentity(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser or user.is_staff:
+            return True
+
+        profile = getattr(user, 'profile', None)
+        return bool(
+            profile
+            and profile.role == Profile.ROLE_MANAGER
+            and profile.can_manage_visual_identity
+        )
+
 
 class NoDestroyModelViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
@@ -428,6 +445,79 @@ class FrontendAnnouncementsView(APIView):
         if size >= 1024:
             return f'{size / 1024:.1f} KB'
         return f'{size} B'
+
+
+class FrontendVisualIdentityView(APIView):
+    parser_classes = [parsers.JSONParser, parsers.MultiPartParser, parsers.FormParser]
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.IsAuthenticated()]
+        return [CanManageVisualIdentity()]
+
+    def get(self, request, *args, **kwargs):
+        visual_identity = self.get_visual_identity()
+        return Response(self.serialize_visual_identity(request, visual_identity))
+
+    @transaction.atomic
+    def put(self, request, *args, **kwargs):
+        uploaded_file = request.FILES.get('brasao') or request.FILES.get('coat_of_arms')
+        if not uploaded_file:
+            return Response(
+                {'detail': 'Envie uma imagem no campo brasao.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validate_visual_identity_image(uploaded_file)
+
+        visual_identity = self.get_visual_identity(for_update=True)
+        visual_identity.coat_of_arms = uploaded_file
+        visual_identity.save(update_fields=['coat_of_arms', 'updated_at'])
+        record_audit_log(request.user, 'visual_identity_updated', visual_identity)
+
+        return Response(self.serialize_visual_identity(request, visual_identity))
+
+    def get_visual_identity(self, for_update=False):
+        institutions = Institution.objects.filter(is_active=True).order_by('id')
+        if for_update:
+            institutions = institutions.select_for_update()
+
+        institution = institutions.first()
+        if institution is None:
+            institution = Institution.objects.create(name='Instituicao Principal')
+
+        visual_identities = VisualIdentity.objects.select_related('institution')
+        if for_update:
+            visual_identities = visual_identities.select_for_update()
+
+        visual_identity, _ = visual_identities.get_or_create(institution=institution)
+        return visual_identity
+
+    def serialize_visual_identity(self, request, visual_identity):
+        coat_of_arms = visual_identity.coat_of_arms
+        return {
+            'id': str(visual_identity.id),
+            'institution_id': str(visual_identity.institution_id),
+            'brasao_url': self.file_url(request, coat_of_arms),
+            'nome_arquivo': self.file_name(coat_of_arms),
+            'updated_at': (
+                timezone.localtime(visual_identity.updated_at).isoformat()
+                if visual_identity.updated_at
+                else None
+            ),
+        }
+
+    def file_url(self, request, file_field):
+        if not file_field:
+            return None
+        try:
+            return request.build_absolute_uri(file_field.url)
+        except (AttributeError, ValueError):
+            return None
+
+    def file_name(self, file_field):
+        name = getattr(file_field, 'name', '') or ''
+        return name.rsplit('/', 1)[-1] if name else ''
 
 
 class AdminAnnouncementsView(APIView):

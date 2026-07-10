@@ -21,7 +21,13 @@ MAX_ATTACHMENT_SIZE = 60 * 1024 * 1024
 MAX_VIDEO_SOURCE_SIZE = 250 * 1024 * 1024
 MAX_VIDEO_DURATION_SECONDS = 60
 MAX_PROFILE_IMAGE_SIZE = 10 * 1024 * 1024
+MAX_VISUAL_IDENTITY_IMAGE_SIZE = 10 * 1024 * 1024
 ALLOWED_PROFILE_IMAGE_CONTENT_TYPES = {
+    'image/jpeg',
+    'image/png',
+    'image/webp',
+}
+ALLOWED_VISUAL_IDENTITY_IMAGE_CONTENT_TYPES = {
     'image/jpeg',
     'image/png',
     'image/webp',
@@ -74,6 +80,18 @@ def validate_profile_picture(uploaded_file):
 
     if uploaded_file.size > MAX_PROFILE_IMAGE_SIZE:
         raise DRFValidationError('A foto de perfil deve ter no máximo 10MB.')
+
+
+def validate_visual_identity_image(uploaded_file):
+    if not uploaded_file:
+        return
+
+    content_type = getattr(uploaded_file, 'content_type', '') or ''
+    if content_type not in ALLOWED_VISUAL_IDENTITY_IMAGE_CONTENT_TYPES:
+        raise DRFValidationError('O brasao deve ser JPG, PNG ou WEBP.')
+
+    if uploaded_file.size > MAX_VISUAL_IDENTITY_IMAGE_SIZE:
+        raise DRFValidationError('O brasao deve ter no maximo 10MB.')
 
 
 def validate_video_duration(uploaded_file, max_seconds):

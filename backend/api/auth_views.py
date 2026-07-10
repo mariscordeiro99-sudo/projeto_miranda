@@ -19,7 +19,29 @@ from rest_framework.views import APIView
 
 from .authentication import issue_auth_token, manager_token_ttl_seconds
 from .media_validation import validate_profile_picture
-from .models import Profile
+from .models import Profile, VisualIdentity
+
+
+def file_url(request, file_field):
+    if not file_field:
+        return None
+    try:
+        return request.build_absolute_uri(file_field.url)
+    except (AttributeError, ValueError):
+        return None
+
+
+def active_brasao_url(request):
+    visual_identity = (
+        VisualIdentity.objects
+        .select_related('institution')
+        .filter(institution__is_active=True)
+        .order_by('institution_id')
+        .first()
+    )
+    if not visual_identity:
+        return None
+    return file_url(request, visual_identity.coat_of_arms)
 
 
 class RegisterView(APIView):
@@ -227,6 +249,7 @@ class LoginView(APIView):
             ),
         }
         permissions_data['isAdmin'] = all(permissions_data.values())
+        brasao_url = active_brasao_url(request)
 
         token = issue_auth_token(user)
         token_expires_in = manager_token_ttl_seconds(user)
@@ -243,6 +266,8 @@ class LoginView(APIView):
                     'first_name': user.first_name,
                     'foto': profile_picture_url,
                     'fotoPerfil': profile_picture_url,
+                    'brasao': brasao_url,
+                    'brasaoUrl': brasao_url,
                     'is_staff': user.is_staff,
                     'is_superuser': user.is_superuser,
                     'role_code': role,

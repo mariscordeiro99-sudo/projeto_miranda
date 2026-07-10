@@ -30,7 +30,7 @@ from api.chat_views import (
     ChatUploadView,
 )
 from api.health import DetailedHealthCheckView, HealthCheckView
-from api.views import AdminAnnouncementsView, DashboardMetricsView, FrontendAnnouncementsView, UserPermissionsView
+from api.views import AdminAnnouncementsView, DashboardMetricsView, FrontendAnnouncementsView, FrontendVisualIdentityView, UserPermissionsView
 
 urlpatterns = [
     path('', lambda request: redirect('admin/')), 
@@ -49,6 +49,10 @@ urlpatterns = [
     path('announcements/', FrontendAnnouncementsView.as_view(), name='frontend-announcements-root-slash'),
     path('announcements', FrontendAnnouncementsView.as_view(), name='frontend-announcements-root'),
     path('dashboard/metrics/', DashboardMetricsView.as_view(), name='dashboard-metrics-root'),
+    path('instituicao/identidade-visual', FrontendVisualIdentityView.as_view(), name='frontend-visual-identity-root'),
+    path('instituicao/identidade-visual/', FrontendVisualIdentityView.as_view(), name='frontend-visual-identity-root-slash'),
+    path('instituicao/identidade-visual/atualizar', FrontendVisualIdentityView.as_view(), name='frontend-visual-identity-update-root'),
+    path('instituicao/identidade-visual/atualizar/', FrontendVisualIdentityView.as_view(), name='frontend-visual-identity-update-root-slash'),
     path('chat/contatos', ChatContactsView.as_view(), name='chat-contacts-root'),
     path('chat/contatos/', ChatContactsView.as_view(), name='chat-contacts-root-slash'),
     path('chat/contatos/<int:contact_id>/ler', ChatMarkReadView.as_view(), name='chat-mark-read-root'),

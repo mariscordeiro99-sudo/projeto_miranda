@@ -96,7 +96,7 @@ def user_photo_url(request, user):
 def message_timestamp(value):
     if not value:
         return ''
-    return timezone.localtime(value).strftime('%H:%M')
+    return timezone.localtime(value).strftime('%d/%m/%Y %H:%M')
 
 
 def message_datetime(value):
