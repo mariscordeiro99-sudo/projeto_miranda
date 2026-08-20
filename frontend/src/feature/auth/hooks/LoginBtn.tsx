@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/Auth";
 import api from '../../../common/services/api';
@@ -32,7 +33,7 @@ export const useLoginBtn = ({ user, password, hasErrors }: LoginBtnProps) => {
                 password: password
             });
 
-            const { token, user: userData } = response.data;
+            const { token } = response.data;
             
             localStorage.setItem("token", token);
             setLoggedUser(user);
@@ -40,8 +41,10 @@ export const useLoginBtn = ({ user, password, hasErrors }: LoginBtnProps) => {
             console.log("Login efetuado para:", user);
             navigate("/home");
 
-        } catch (err: any) {
-            const errorMessage = err.response?.data?.detail || "Usuário ou senha inválidos.";
+        } catch (err: unknown) {
+            const errorMessage = axios.isAxiosError<{ detail?: string }>(err)
+                ? err.response?.data?.detail || "Usuário ou senha inválidos."
+                : "Não foi possível concluir o login.";
             setError(errorMessage);
             console.error("Erro ao fazer login:", err);
         } finally {

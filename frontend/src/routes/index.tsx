@@ -5,13 +5,8 @@ import { LoginPage } from '../pages/login';
 import { RegisterPage } from '../pages/register';
 import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
 import { AppRoutes as RoutePaths } from '../routes/types/loginReg';
-import { useAuth } from '../feature/auth/hooks/Auth'; // Ajuste o caminho se necessário
-import { api } from '../common/services/api'; // Caminho da sua conexão com o backend
-
-// Definição de tipo para o usuário (ajuste conforme seu projeto)
-interface UserWithRole {
-  role: string;
-}
+import { useAuth } from '../feature/auth/hooks/Auth';
+import { api } from '../common/services/api';
 
 export const AppRouter: React.FC = () => {
   const { shouldRequireLogin, saveExitTime } = useSessionGuard();
@@ -21,14 +16,12 @@ export const AppRouter: React.FC = () => {
 
   const isAuthenticated = !!loggedUser;
 
-  // Gerencia o tempo de saída (Sessão)
   useEffect(() => {
     const handleUnload = () => saveExitTime();
     window.addEventListener('beforeunload', handleUnload);
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [saveExitTime]);
 
-  // Testa a comunicação com o seu Backend FastAPI
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -45,19 +38,15 @@ export const AppRouter: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rota da Splash Screen do Tagor */}
         <Route path={RoutePaths.SPLASH} element={<SplashPage />} />
 
-        {/* Rota de Login com a lógica de sessão */}
         <Route 
           path={RoutePaths.LOGIN} 
           element={shouldRequireLogin() ? <LoginPage /> : <Navigate to="/home" />} 
         />
 
-        {/* Rota de Cadastro */}
         <Route path={RoutePaths.REGISTER} element={<RegisterPage />} />
 
-        {/* Home / Dashboard com integração do Backend */}
         <Route 
           path="/home" 
           element={
@@ -76,7 +65,6 @@ export const AppRouter: React.FC = () => {
           } 
         />
 
-        {/* Redirecionamento padrão caso a rota não exista */}
         <Route path="*" element={<Navigate to={RoutePaths.SPLASH} replace />} />
       </Routes>
     </BrowserRouter>

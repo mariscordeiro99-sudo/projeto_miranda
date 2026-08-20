@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -9,11 +10,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 import hashlib
 import secrets
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE_URL = f"sqlite:///{BASE_DIR / 'fastapi_db.sqlite'}"
+load_dotenv(BASE_DIR / ".env")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+DATABASE_URL = os.getenv(
+    "FASTAPI_DATABASE_URL",
+    f"sqlite:///{BASE_DIR / 'fastapi_db.sqlite'}",
+)
+
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -114,24 +122,31 @@ def get_db():
         db.close()
 
 
-# Create test user on startup
-def create_test_user():
+# Cria o usuário inicial somente quando as credenciais forem configuradas.
+def create_initial_user():
+    username = os.getenv("FASTAPI_ADMIN_USERNAME")
+    password = os.getenv("FASTAPI_ADMIN_PASSWORD")
+    email = os.getenv("FASTAPI_ADMIN_EMAIL") or None
+
+    if not username or not password:
+        return
+
     db = SessionLocal()
-    existing_user = db.query(UserModel).filter(UserModel.username == "admin").first()
+    existing_user = db.query(UserModel).filter(UserModel.username == username).first()
     if not existing_user:
-        test_user = UserModel(
-            username="admin",
-            email="admin@miranda.gov.br",
-            password_hash=hash_password("Admin@123")
+        initial_user = UserModel(
+            username=username,
+            email=email,
+            password_hash=hash_password(password)
         )
-        db.add(test_user)
+        db.add(initial_user)
         db.commit()
     db.close()
 
 
 @app.on_event("startup")
 def startup_event():
-    create_test_user()
+    create_initial_user()
 
 
 @app.get("/")
