@@ -12,6 +12,21 @@ dist
 dist-ssr
 *.local
 
+# Configurações locais e credenciais
+.env
+.env.*
+!.env.example
+
+# Python e bancos locais
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.db
+*.sqlite
+*.sqlite3
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

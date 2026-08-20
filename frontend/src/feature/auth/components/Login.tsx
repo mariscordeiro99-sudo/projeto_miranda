@@ -10,8 +10,8 @@ const Login: React.FC = () => {
   const { 
     password, 
     setPassword, 
-    loginId, 
-    handleLoginIdChange 
+    user: loginId,
+    setUser,
   } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,7 +38,7 @@ const Login: React.FC = () => {
               type="text" 
               className="form-input" 
               value={loginId}
-              onChange={handleLoginIdChange}
+              onChange={(event) => setUser(event.target.value)}
               placeholder="seu@dominio.com ou (00) 00000-0000"
               required
             />
