@@ -4,7 +4,7 @@ import { AppRoutes } from '../../../routes/types/loginReg';
 import { SPLASH_CONFIG } from '../types/splashConfig';
 
 export const useSplash = () => {
-  const [seconds, setSeconds] = useState(SPLASH_CONFIG.DURATION_MS / 10000);
+  const [seconds, setSeconds] = useState(SPLASH_CONFIG.DURATION_MS / 1000);
   const navigate = useNavigate();
 
   useEffect(() => {

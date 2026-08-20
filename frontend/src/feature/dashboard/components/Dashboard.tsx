@@ -1,68 +1,74 @@
-import React, { useEffect, useState } from "react";
-import { Card } from "../../../common/components/Card";
-import { NavBar } from "../../../common/components/NavBar";
-import { api } from "../../../common/services/api";
-import "../styles/dash.css";
+import React from 'react';
+import { Users, MessageSquare, Eye, RefreshCw, AlertCircle } from 'lucide-react';
+import { useDashboard } from '../hook/useDashboard';
+import '../styles/dash.css';
 
-interface DashItem {
-    title: string;
-    value: string | number;
-}
+const Dashboard: React.FC = () => {
+  const { metrics, isLoading, error, refetch } = useDashboard();
 
-const DASHBOARD_DATA: DashItem[] = [
-    { title: "Mensagens Enviadas", value: 0 },
-    { title: "Usuários Ativos", value: 0 },
-    { title: "Taxa de Visualização", value: "0%" },
-];
-
-export const Dash: React.FC = () => {
-    const [apiMessage, setApiMessage] = useState<string>("");
-    const [apiError, setApiError] = useState<string>("");
-
-    useEffect(() => {
-        api.get("/hello")
-            .then((response) => {
-                setApiMessage(response.data.message || "Comunicação estabelecida.");
-            })
-            .catch((error) => {
-                console.error("Erro ao chamar backend FastAPI:", error);
-                setApiError("Não foi possível conectar ao backend.");
-            });
-    }, []);
-
+  if (isLoading) {
     return (
-        <div className="home">
-            <NavBar />
-            
-            <Card
-                title="Painel Geral"
-                classTitle="dashboard-title"
-                classCardHeader="topDash"
-                classCard="dashboard-card"
-                classCardContent="dashboard-card-content"
-                contentCard={
-                    <div className="dashContent">
-                        {DASHBOARD_DATA.map((item, index) => (
-                            <Card
-                                key={index}
-                                title={item.title}
-                                classTitle="miniTitle"
-                                classCardHeader="topCard"
-                                classCard="logCard"
-                                classCardContent="counterContent"
-                                contentCard={
-                                    <span className="counter">{item.value}</span>
-                                }
-                            />
-                        ))}
-                        <div className="api-status">
-                            <h3>Backend FastAPI</h3>
-                            {apiMessage && <p>{apiMessage}</p>}
-                            {apiError && <p className="error">{apiError}</p>}
-                        </div>
-                    </div>
-                }
-            />
+      <main className="dashboard-container state-centered">
+        <div className="loading-wrapper">
+          <RefreshCw className="spinner" size={40} />
+          <p>Carregando métricas do painel...</p>
         </div>
+      </main>
     );
+  }
+
+  if (error) {
+    return (
+      <main className="dashboard-container state-centered">
+        <div className="error-card">
+          <AlertCircle size={48} color="#dc2626" />
+          <h3>Ops! Algo deu errado</h3>
+          <p>{error}</p>
+          <button onClick={refetch} className="btn-retry">
+            Tentar novamente
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="dashboard-container">
+      <div className="dashboard-grid">
+
+        <div className="metric-card card-usuarios">
+          <div className="card-icon-wrapper">
+            <Users size={32} />
+          </div>
+          <div className="card-info">
+            <h3>Usuários Ativos</h3>
+            <p className="card-value">{metrics.usuariosAtivos}</p>
+          </div>
+        </div>
+
+        <div className="metric-card card-mensagens">
+          <div className="card-icon-wrapper">
+            <MessageSquare size={32} />
+          </div>
+          <div className="card-info">
+            <h3>Mensagens Enviadas</h3>
+            <p className="card-value">{metrics.mensagensEnviadas}</p>
+          </div>
+        </div>
+
+        <div className="metric-card card-visualizacao">
+          <div className="card-icon-wrapper">
+            <Eye size={40} />
+          </div>
+          <div className="card-info">
+            <h3>Taxa de Visualização</h3>
+            <p className="card-value value-large">{metrics.taxaVisualizacao}</p>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  );
 };
+
+export default Dashboard;

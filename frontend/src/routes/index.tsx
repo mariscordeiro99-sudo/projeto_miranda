@@ -1,71 +1,64 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { SplashPage } from '../pages/splash';
 import { LoginPage } from '../pages/login';
-import { RegisterPage } from '../pages/register';
+import { LoginSuccessPage } from '../pages/loginSuccess';
+import { DashboardPage } from '../pages/dashboard';
 import { useSessionGuard } from '../routes/hooks/useSessionsGuard';
-import { AppRoutes as RoutePaths } from '../routes/types/loginReg';
-import { useAuth } from '../feature/auth/hooks/Auth';
-import { api } from '../common/services/api';
+import { useRoleRedirect } from '../routes/hooks/useRoleRedirect';
+import { CommunicationPage } from '../pages/communication';
+import { ConversationPage } from '../pages/conversation';
+import { ControlAcessPage } from '../pages/controlAcess';
+import { AnnouncementsEdtPage } from '../pages/announEdt';
+import { IdentificationPage } from '../pages/identification';
+import { AppRoutes } from '../routes/types/loginReg';
+import { RegisterPage } from '../pages/register';
+import { ProtectedRoute } from './protectedRoute';
 
 export const AppRouter: React.FC = () => {
   const { shouldRequireLogin, saveExitTime } = useSessionGuard();
-  const { loggedUser } = useAuth();
-  const [apiMessage, setApiMessage] = useState<string>("");
-  const [apiError, setApiError] = useState<string>("");
-
-  const isAuthenticated = !!loggedUser;
+  const { getInitialRoutePath } = useRoleRedirect();
 
   useEffect(() => {
     const handleUnload = () => saveExitTime();
     window.addEventListener('beforeunload', handleUnload);
+
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [saveExitTime]);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
+  const renderDashboardElement = () => {
+    const targetPath = getInitialRoutePath();
 
-    api.get('/hello')
-      .then((response) => {
-        setApiMessage(response.data.message || 'Comunicação estabelecida.');
-      })
-      .catch((error) => {
-        console.error('Erro ao chamar backend FastAPI:', error);
-        setApiError('Não foi possível conectar ao backend.');
-      });
-  }, [isAuthenticated]);
+    if (targetPath && targetPath !== AppRoutes.DASHBOARD) {
+      return <Navigate to={targetPath} replace />;
+    }
+
+    return <DashboardPage />;
+  };
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route path={RoutePaths.SPLASH} element={<SplashPage />} />
+        <Route path={AppRoutes.SPLASH} element={<SplashPage />} />
 
-        <Route 
-          path={RoutePaths.LOGIN} 
-          element={shouldRequireLogin() ? <LoginPage /> : <Navigate to="/home" />} 
+        <Route
+          path={AppRoutes.LOGIN}
+          element={shouldRequireLogin() ? <LoginPage /> : <Navigate to={AppRoutes.DASHBOARD} replace />}
         />
 
-        <Route path={RoutePaths.REGISTER} element={<RegisterPage />} />
+        <Route path={AppRoutes.REGISTER} element={<RegisterPage />} />
+        <Route path={AppRoutes.LOGIN_SUCCESS} element={<LoginSuccessPage />} />
 
-        <Route 
-          path="/home" 
-          element={
-            isAuthenticated ? (
-              <div className="page-wrapper">
-                <h1>Logado com sucesso!</h1>
-                <div>
-                  <h2>Status do Backend FastAPI</h2>
-                  {apiMessage && <p style={{ color: 'green' }}>{apiMessage}</p>}
-                  {apiError && <p style={{ color: 'red' }}>{apiError}</p>}
-                </div>
-              </div>
-            ) : (
-              <Navigate to={RoutePaths.LOGIN} replace />
-            )
-          } 
-        />
+        <Route element={<ProtectedRoute />}>
+          <Route path={AppRoutes.DASHBOARD} element={renderDashboardElement()} />
+          <Route path={AppRoutes.COMUNICADOS} element={<CommunicationPage />} />
+          <Route path={AppRoutes.CONVERSAS} element={<ConversationPage />} />
+          <Route path={AppRoutes.EDICAO_COMUNICADOS} element={<AnnouncementsEdtPage />} />
+          <Route path={AppRoutes.CONTROLE_ACESSO} element={<ControlAcessPage />} />
+          <Route path={AppRoutes.IDENTIFICATION} element={<IdentificationPage />} />
+        </Route>
 
-        <Route path="*" element={<Navigate to={RoutePaths.SPLASH} replace />} />
+        <Route path="*" element={<Navigate to={AppRoutes.LOGIN} replace />} />
       </Routes>
     </BrowserRouter>
   );

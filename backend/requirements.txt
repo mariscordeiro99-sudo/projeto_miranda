@@ -1,17 +1,31 @@
-asgiref==3.11.1
-attrs==26.1.0
-Django==6.0.4
-django-cors-headers==4.9.0
-djangorestframework==3.17.1
-drf-spectacular==0.29.0
-inflection==0.5.1
-jsonschema==4.26.0
-jsonschema-specifications==2025.9.1
-mysqlclient==2.2.8
+# Servidor de Produção
+gunicorn==23.0.0
+
+# Base do Django
+django>=5.2.17,<5.3
+django-jazzmin==3.0.4
+dj-database-url==2.1.0
+
+# Banco de Dados
+PyMySQL==1.1.2
+cryptography>=50.0.0,<51.0
+
+# API e Documentação
+djangorestframework
+django-filter
+django-cors-headers
+drf-spectacular
+drf-spectacular-sidecar
+
+# Variáveis de Ambiente e Utilitários
 python-dotenv==1.2.2
-PyYAML==6.0.3
-referencing==0.37.0
-rpds-py==0.30.0
-sqlparse==0.5.5
-typing_extensions==4.15.0
-uritemplate==4.2.0
+pillow
+requests
+firebase-admin==6.5.0
+cloudinary
+django-redis
+celery
+python-json-logger
+imageio-ffmpeg==0.6.0
+
+whitenoise==6.6.0

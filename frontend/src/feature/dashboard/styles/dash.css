@@ -1,0 +1,162 @@
+.dashboard-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.dashboard-container {
+    padding-top: 90px;
+    padding-bottom: 24px;
+    padding-inline: 24px;
+    flex: 1;
+    display: flex;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1.2fr;
+    grid-template-areas:
+        "usuarios mensagens"
+        "visualizacao visualizacao";
+    gap: 20px;
+    width: 100%;
+    flex: 1;
+}
+
+.card-usuarios {
+    grid-area: usuarios;
+}
+
+.card-mensagens {
+    grid-area: mensagens;
+}
+
+.card-visualizacao {
+    grid-area: visualizacao;
+    justify-content: center;
+    text-align: center;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.metric-card {
+    background-color: #ffffff;
+    border-radius: 16px;
+    padding: 30px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+    border: 1px solid #f1f5f9;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}
+
+.card-icon-wrapper {
+    background-color: #f0f4ff;
+    color: #4169E1;
+    padding: 18px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.card-info h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.card-value {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 800;
+    color: #000000;
+}
+
+.card-visualizacao .card-icon-wrapper {
+    background-color: #f3e8ff;
+    color: #7f00ff;
+    padding: 22px;
+}
+
+.value-large {
+    font-size: 48px;
+}
+
+
+@media (max-width: 750px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(3, 1fr);
+        grid-template-areas:
+            "usuarios"
+            "mensagens"
+            "visualizacao";
+    }
+
+    .card-visualizacao {
+        flex-direction: row;
+        justify-content: flex-start;
+        text-align: left;
+        gap: 24px;
+    }
+
+    .value-large {
+        font-size: 32px;
+    }
+}
+
+.state-centered {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 50vh;
+  text-align: center;
+}
+
+.loading-wrapper {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+.error-card {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  max-width: 400px;
+}
+
+.btn-retry {
+  margin-top: 15px;
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

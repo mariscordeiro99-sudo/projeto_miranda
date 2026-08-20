@@ -1,0 +1,550 @@
+:root {
+  --miranda-ink: #172033;
+  --miranda-muted: #667085;
+  --miranda-border: #d9e1ec;
+  --miranda-surface: #ffffff;
+  --miranda-soft: #f5f7fb;
+  --miranda-blue: #255c99;
+  --miranda-green: #1f8a70;
+  --miranda-indigo: #4c5fd7;
+  --miranda-cyan: #087d8f;
+  --miranda-teal: #0f766e;
+  --miranda-red: #c2413d;
+  --miranda-amber: #b7791f;
+}
+
+.brand-link {
+  font-weight: 800;
+}
+
+.brand-link .brand-image.miranda-site-logo {
+  border-radius: 0;
+  box-shadow: none !important;
+  height: 30px;
+  margin-left: 4px !important;
+  max-height: 30px;
+  object-fit: contain;
+  width: 100px;
+}
+
+.brand-link .brand-text {
+  color: #273ff5 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0;
+}
+
+#jazzy-logo .brand-image.miranda-site-logo {
+  display: none !important;
+}
+
+.login-logo img {
+  border-radius: 0;
+  display: inline-block;
+  height: auto;
+  max-height: 72px;
+  max-width: 220px;
+  object-fit: contain;
+  width: min(220px, 80%);
+}
+
+.navbar-primary,
+.btn-primary {
+  background-color: var(--miranda-blue) !important;
+  border-color: var(--miranda-blue) !important;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: #1d4f86 !important;
+  border-color: #1d4f86 !important;
+}
+
+[class*="sidebar-light"] .nav-sidebar > .nav-item > .nav-link.active {
+  background: var(--miranda-blue);
+  color: #ffffff;
+}
+
+[class*="sidebar-light"] .nav-sidebar .nav-treeview > .nav-item > .nav-link.active {
+  background: #e8f0f8;
+  color: var(--miranda-blue);
+}
+
+body.dashboard #content-related,
+body.dashboard #recent-actions-module,
+body.dashboard .recent-actions,
+body.dashboard .recent-actions-module {
+  display: none !important;
+}
+
+.miranda-dashboard-page #content {
+  max-width: 100%;
+}
+
+.miranda-admin-dashboard {
+  display: grid;
+  gap: 20px;
+}
+
+.miranda-dashboard-header {
+  align-items: flex-end;
+  background: var(--miranda-surface);
+  border: 1px solid var(--miranda-border);
+  border-left: 5px solid var(--miranda-blue);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 22px 24px;
+}
+
+.miranda-dashboard-eyebrow,
+.miranda-panel-header span {
+  color: var(--miranda-blue);
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.miranda-dashboard-header h1,
+.miranda-panel-header h2,
+.miranda-app-group h3 {
+  color: var(--miranda-ink);
+  letter-spacing: 0;
+  margin: 0;
+}
+
+.miranda-dashboard-header h1 {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.miranda-dashboard-header p {
+  color: var(--miranda-muted);
+  margin: 8px 0 0;
+}
+
+.miranda-metric-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.miranda-metric-card {
+  align-items: center;
+  background: var(--miranda-surface);
+  border: 1px solid var(--miranda-border);
+  border-radius: 8px;
+  color: var(--miranda-ink);
+  display: flex;
+  gap: 12px;
+  min-height: 112px;
+  padding: 16px;
+  text-decoration: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.miranda-metric-card:hover,
+.miranda-metric-card:focus {
+  border-color: var(--miranda-blue);
+  box-shadow: 0 12px 30px rgba(37, 92, 153, 0.12);
+  color: var(--miranda-ink);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.miranda-metric-card-danger:hover,
+.miranda-metric-card-danger:focus {
+  border-color: var(--miranda-red);
+  box-shadow: 0 12px 30px rgba(194, 65, 61, 0.12);
+}
+
+.miranda-metric-icon {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  flex: 0 0 42px;
+  height: 42px;
+  justify-content: center;
+}
+
+.miranda-metric-icon i {
+  color: #ffffff;
+  font-size: 1rem;
+}
+
+.miranda-metric-icon-blue {
+  background: var(--miranda-blue);
+}
+
+.miranda-metric-icon-green {
+  background: var(--miranda-green);
+}
+
+.miranda-metric-icon-indigo {
+  background: var(--miranda-indigo);
+}
+
+.miranda-metric-icon-cyan {
+  background: var(--miranda-cyan);
+}
+
+.miranda-metric-icon-teal {
+  background: var(--miranda-teal);
+}
+
+.miranda-metric-icon-red {
+  background: var(--miranda-red);
+}
+
+.miranda-metric-content {
+  min-width: 0;
+}
+
+.miranda-metric-content strong {
+  color: var(--miranda-ink);
+  display: block;
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.miranda-metric-content span {
+  color: var(--miranda-muted);
+  display: block;
+  font-size: 0.88rem;
+  line-height: 1.25;
+}
+
+.miranda-dashboard-layout {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.8fr);
+}
+
+.miranda-panel,
+.miranda-app-group {
+  background: var(--miranda-surface);
+  border: 1px solid var(--miranda-border);
+  border-radius: 8px;
+}
+
+.miranda-panel {
+  padding: 18px;
+}
+
+.miranda-panel-wide {
+  min-width: 0;
+}
+
+.miranda-panel-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.miranda-panel-header h2 {
+  font-size: 1.12rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.miranda-panel-header > i {
+  align-items: center;
+  background: #edf4fb;
+  border-radius: 8px;
+  color: var(--miranda-blue);
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.miranda-table-wrap {
+  overflow-x: auto;
+}
+
+.miranda-dashboard-table {
+  border-collapse: collapse;
+  min-width: 680px;
+  width: 100%;
+}
+
+.miranda-dashboard-table th,
+.miranda-dashboard-table td {
+  border-bottom: 1px solid var(--miranda-border);
+  color: var(--miranda-ink);
+  padding: 12px 10px;
+  vertical-align: middle;
+}
+
+.miranda-dashboard-table th {
+  color: var(--miranda-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.miranda-dashboard-table a {
+  color: var(--miranda-blue);
+  font-weight: 800;
+}
+
+.miranda-dashboard-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.miranda-status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 7px 9px;
+  white-space: nowrap;
+}
+
+.miranda-status-success {
+  background: #e7f6ef;
+  color: var(--miranda-green);
+}
+
+.miranda-status-muted {
+  background: #eef2f7;
+  color: #475467;
+}
+
+.miranda-side-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.miranda-mini-stats {
+  display: grid;
+  gap: 10px;
+}
+
+.miranda-mini-stats div {
+  align-items: center;
+  background: var(--miranda-soft);
+  border: 1px solid #e7edf5;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.miranda-mini-stats span {
+  color: var(--miranda-muted);
+  font-weight: 700;
+}
+
+.miranda-mini-stats strong {
+  color: var(--miranda-ink);
+  font-size: 1.2rem;
+}
+
+.miranda-panel-alert .miranda-panel-header span,
+.miranda-panel-alert .miranda-panel-header > i {
+  color: var(--miranda-red);
+}
+
+.miranda-panel-alert .miranda-panel-header > i {
+  background: #fff0ef;
+}
+
+.miranda-list {
+  display: grid;
+  gap: 10px;
+}
+
+.miranda-list a {
+  background: #fff8f7;
+  border: 1px solid #f2d0cd;
+  border-radius: 8px;
+  color: var(--miranda-ink);
+  display: block;
+  padding: 12px;
+  text-decoration: none;
+}
+
+.miranda-list a:hover,
+.miranda-list a:focus {
+  border-color: var(--miranda-red);
+  color: var(--miranda-ink);
+  text-decoration: none;
+}
+
+.miranda-list strong,
+.miranda-list span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.miranda-list strong {
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.miranda-list span,
+.miranda-list p {
+  color: var(--miranda-muted);
+  margin: 0;
+}
+
+.miranda-admin-shortcuts {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.miranda-app-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.miranda-app-group {
+  padding: 16px;
+}
+
+.miranda-app-group h3 {
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.3;
+  margin-bottom: 12px;
+}
+
+.miranda-app-group ul {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.miranda-app-group li {
+  align-items: center;
+  border-top: 1px solid #edf1f6;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-height: 38px;
+  padding-top: 8px;
+}
+
+.miranda-app-group li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.miranda-app-group a {
+  color: var(--miranda-blue);
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.miranda-add-link {
+  align-items: center;
+  background: #eaf3fb;
+  border-radius: 8px;
+  display: inline-flex;
+  flex: 0 0 30px;
+  height: 30px;
+  justify-content: center;
+  text-decoration: none;
+  width: 30px;
+}
+
+.miranda-add-link:hover,
+.miranda-add-link:focus {
+  background: var(--miranda-blue);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.login-page {
+  background: #f3f6fa !important;
+}
+
+.login-box {
+  width: min(420px, calc(100% - 32px));
+}
+
+.login-logo,
+.login-logo a {
+  color: var(--miranda-ink) !important;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.login-box .card {
+  border: 1px solid var(--miranda-border);
+  border-radius: 8px;
+  box-shadow: 0 18px 46px rgba(23, 32, 51, 0.14);
+  overflow: hidden;
+}
+
+.login-card-body {
+  padding: 28px;
+}
+
+.login-card-body .login-box-msg {
+  color: var(--miranda-muted);
+  font-weight: 700;
+}
+
+.login-card-body .input-group .form-control {
+  border-color: var(--miranda-border);
+  min-height: 44px;
+}
+
+.login-card-body .input-group-text {
+  background: var(--miranda-soft);
+  border-color: var(--miranda-border);
+  color: var(--miranda-blue);
+}
+
+.login-card-body .btn {
+  border-radius: 6px;
+  font-weight: 800;
+  min-height: 42px;
+}
+
+@media (max-width: 1400px) {
+  .miranda-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 992px) {
+  .miranda-dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .miranda-dashboard-header {
+    align-items: flex-start;
+    padding: 18px;
+  }
+
+  .miranda-dashboard-header h1 {
+    font-size: 1.45rem;
+  }
+
+  .miranda-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .miranda-metric-card {
+    min-height: 96px;
+  }
+}

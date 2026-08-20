@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/Auth'; // Ajustado para o seu hook atual
+import { useAuth } from '../hooks/useAuth';
 import { authService } from '../services/auth';
 import { AppRoutes } from '../../../routes/types/loginReg';
+import type { ApiError } from '../../../common/types/apiError';
+import { ForgotPasswordCard } from '../../../common/components/ForgotPasswordCard';
 import '../styles/login.css';
 
 const Login: React.FC = () => {
@@ -10,21 +12,49 @@ const Login: React.FC = () => {
   const { 
     password, 
     setPassword, 
-    user: loginId,
-    setUser,
+    loginId, 
+    handleLoginIdChange 
   } = useAuth();
+
+  const [isRecovering, setIsRecovering] = useState<boolean>(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const response = await authService.login({ identificador: loginId, senha: password });
+      const userData = response.data.user;
+
+      localStorage.setItem('auth_token', response.data.access_token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('user_data', JSON.stringify(userData));
+      localStorage.setItem('@App:last_access', Date.now().toString());
+
+      if (userData?.id && userData?.permissoes) {
+        localStorage.setItem(`permissoes_${userData.id}`, JSON.stringify(userData.permissoes));
+      }
+
       console.log('Sucesso:', response.data);
-      // Aqui você pode redirecionar para a home após o login
-      navigate('/home');
+      navigate(AppRoutes.LOGIN_SUCCESS);
     } catch (error) {
       console.error('Erro ao entrar:', error);
+      
+      const apiError = error as ApiError;
+      const mensagemErro = apiError.response?.data?.detail || 'Erro ao efetuar login.';
+      
+      alert(mensagemErro);
     }
   };
+
+  if (isRecovering) {
+    return (
+      <div className="auth-container">
+        <ForgotPasswordCard 
+          onSuccess={() => setIsRecovering(false)} 
+          onBackToLogin={() => setIsRecovering(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="auth-container">
@@ -38,7 +68,7 @@ const Login: React.FC = () => {
               type="text" 
               className="form-input" 
               value={loginId}
-              onChange={(event) => setUser(event.target.value)}
+              onChange={handleLoginIdChange}
               placeholder="seu@dominio.com ou (00) 00000-0000"
               required
             />
@@ -56,7 +86,13 @@ const Login: React.FC = () => {
           </div>
 
           <div className="auth-footer">
-            <button type="button" className="btn-link">Esqueceu sua senha?</button>
+            <button 
+              type="button" 
+              className="btn-link"
+              onClick={() => setIsRecovering(true)}
+            >
+              Esqueceu sua senha?
+            </button>
             <div className="divider"></div>
             <button 
               type="button"

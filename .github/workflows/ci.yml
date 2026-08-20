@@ -23,7 +23,7 @@ jobs:
       - name: Configure Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -42,7 +42,12 @@ jobs:
       run:
         working-directory: backend
     env:
+      DEBUG: "true"
+      SECRET_KEY: ci-only-not-for-production
+      DJANGO_DEBUG: "true"
       DJANGO_SECRET_KEY: ci-only-not-for-production
+      DATABASE_URL: "sqlite:///:memory:"
+      DB_SSL_REQUIRED: "false"
 
     steps:
       - name: Checkout
@@ -57,16 +62,14 @@ jobs:
             backend/requirements.txt
             backend/requirements-fastapi.txt
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y default-libmysqlclient-dev pkg-config
-
       - name: Install Python dependencies
         run: pip install -r requirements.txt -r requirements-fastapi.txt
 
       - name: Check Django configuration
         run: python manage.py check
+
+      - name: Check Django migrations
+        run: python manage.py makemigrations --check --dry-run
 
       - name: Run backend tests
         run: python manage.py test
