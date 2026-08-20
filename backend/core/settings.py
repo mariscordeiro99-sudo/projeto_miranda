@@ -67,10 +67,10 @@ def db_ca_cert_path():
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_bool('DEBUG', False)
+DEBUG = env_bool('DJANGO_DEBUG', env_bool('DEBUG', False))
 
 # SECURITY WARNING: keep the secret key used in production secret.
-SECRET_KEY = os.getenv('SECRET_KEY')
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY') or os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     if DEBUG:
         SECRET_KEY = 'django-insecure-dev-only-set-secret-key-in-env'
@@ -78,7 +78,10 @@ if not SECRET_KEY:
         raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG is false.')
 
 default_allowed_hosts = 'localhost,127.0.0.1' if DEBUG else ''
-ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', default_allowed_hosts)
+ALLOWED_HOSTS = env_list(
+    'DJANGO_ALLOWED_HOSTS',
+    os.getenv('ALLOWED_HOSTS', default_allowed_hosts),
+)
 
 render_hostname = os.getenv('RENDER_EXTERNAL_HOSTNAME')
 if render_hostname:

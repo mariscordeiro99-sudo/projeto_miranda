@@ -17,7 +17,8 @@ Plataforma interna de comunicação e gestão institucional. O sistema centraliz
 | Camada | Tecnologias |
 | --- | --- |
 | Frontend | React, TypeScript, Vite e Axios |
-| Backend | Python, Django e Django REST Framework |
+| Backend principal | Python, Django e Django REST Framework |
+| Backend alternativo | FastAPI, SQLAlchemy e Pydantic |
 | Dados e filas | MySQL, Redis e Celery |
 | Infraestrutura | Docker, Cloudinary e Render |
 | Qualidade | ESLint, testes Django e GitHub Actions |
@@ -25,7 +26,7 @@ Plataforma interna de comunicação e gestão institucional. O sistema centraliz
 ## Estrutura
 
 ```text
-backend/    API, regras de negócio, migrações, testes e documentação
+backend/    API Django, protótipo FastAPI, regras de negócio, testes e documentação
 frontend/   interface React e integração com a API
 ```
 
@@ -42,6 +43,18 @@ cp .env.example .env
 python manage.py migrate
 python manage.py runserver
 ```
+
+O Django usa SQLite quando `DATABASE_URL` não está configurada. Para executar o
+protótipo FastAPI, instale as dependências adicionais e inicie o Uvicorn:
+
+```bash
+pip install -r requirements-fastapi.txt
+uvicorn fastapi_app:app --reload --host 127.0.0.1 --port 8000
+```
+
+O FastAPI só cria um usuário inicial quando `FASTAPI_ADMIN_USERNAME` e
+`FASTAPI_ADMIN_PASSWORD` são definidos no arquivo `.env`; não há credenciais
+padrão embutidas.
 
 ### Frontend
 
@@ -69,6 +82,6 @@ npm run build
 
 ## Segurança
 
-Arquivos `.env`, bancos locais, chaves e certificados não devem ser versionados. Os arquivos `.env.example` documentam somente os nomes das variáveis e usam valores fictícios.
+Arquivos `.env`, bancos locais, chaves e certificados não devem ser versionados. Os arquivos `.env.example` documentam somente os nomes das variáveis e usam valores fictícios. Django e FastAPI leem segredos e credenciais exclusivamente do ambiente.
 
 O Projeto Miranda é destinado a ambientes institucionais com acesso controlado. Cada implantação deve configurar corretamente autenticação, autorização, origens permitidas, SSL e gestão de credenciais.

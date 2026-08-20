@@ -1,6 +1,10 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const configuredBaseUrl = import.meta.env.VITE_API_URL;
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const baseURL = configuredBaseUrl
+  || configuredApiBaseUrl?.replace(/\/api\/?$/, '')
+  || 'http://localhost:8000';
 
 const api = axios.create({
   baseURL,
@@ -19,3 +23,4 @@ api.interceptors.request.use((config) => {
 });
 
 export default api;
+export { api };

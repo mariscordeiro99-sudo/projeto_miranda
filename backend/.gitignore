@@ -1,0 +1,27 @@
+# Segredos e configurações locais
+.env
+.env.*
+!.env.example
+
+# Ambientes Virtuais
+venv/
+env/
+
+# Python (Arquivos compilados e cache)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+*.db
+*.sqlite
+*.sqlite3
+
+# IDEs e Sistema Operacional
+.vscode/
+.idea/
+.DS_Store

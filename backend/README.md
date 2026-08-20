@@ -1,6 +1,6 @@
 # Backend do Projeto Miranda
 
-API do sistema interno de comunicação institucional, desenvolvida com Django e Django REST Framework.
+API do sistema interno de comunicação institucional, desenvolvida com Django e Django REST Framework. O diretório também mantém um protótipo alternativo em FastAPI para validar autenticação e operações de documentos.
 
 ## Recursos principais
 
@@ -41,6 +41,20 @@ O arquivo `.env.example` contém apenas nomes e valores de exemplo. Credenciais 
 - painel administrativo: `http://127.0.0.1:8000/admin/`
 - documentação OpenAPI: `http://127.0.0.1:8000/api/docs/`
 - verificação de saúde: `http://127.0.0.1:8000/health/`
+
+## FastAPI alternativo
+
+Instale as dependências adicionais e inicie o servidor:
+
+```bash
+pip install -r requirements-fastapi.txt
+uvicorn fastapi_app:app --reload --host 127.0.0.1 --port 8000
+```
+
+O banco padrão é local e pode ser substituído por `FASTAPI_DATABASE_URL`. Um
+usuário inicial só é criado quando `FASTAPI_ADMIN_USERNAME` e
+`FASTAPI_ADMIN_PASSWORD` são configurados no `.env`; a aplicação não possui
+senha administrativa padrão.
 
 ## Qualidade
 
