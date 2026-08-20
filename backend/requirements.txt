@@ -1,14 +1,14 @@
 # Servidor de Produção
-gunicorn==21.2.0
+gunicorn==23.0.0
 
 # Base do Django
-django>=4.2,<5.0
+django>=5.2.17,<5.3
 django-jazzmin==3.0.4
 dj-database-url==2.1.0
 
 # Banco de Dados
-PyMySQL==1.1.0
-cryptography==41.0.7
+PyMySQL==1.1.2
+cryptography>=50.0.0,<51.0
 
 # API e Documentação
 djangorestframework
@@ -18,7 +18,7 @@ drf-spectacular
 drf-spectacular-sidecar
 
 # Variáveis de Ambiente e Utilitários
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 pillow
 requests
 firebase-admin==6.5.0

@@ -1,53 +1,48 @@
-# Segredos e Configurações Locais (NUNCA SUBIR)
-.env
+# Dependencias e artefatos do frontend
+node_modules/
+dist/
+build/
+coverage/
 
-# Ambientes Virtuais
-venv/
-env/
-
-# Python (Arquivos compilados e cache)
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Django
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Variaveis de ambiente e credenciais
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Banco de dados local
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+
+# Django e arquivos gerados
+backend/media/
+backend/staticfiles/
+backend/logs/
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
-backend/staticfiles/
 
-# IDEs e Sistema Operacional
+# Editores e sistema operacional
 .vscode/
 .idea/
 .DS_Store
-
-# Arquivos de segredos (O MAIS IMPORTANTE)
-.env
-.env.production
-
-# Ambientes, Banco de Dados e Cache
-venv/
-env/
-db.sqlite3
-__pycache__/
-*.pyc
-
-# Arquivos de segredos (O MAIS IMPORTANTE)
-.env
-.env.production
-
-# Ambientes, Banco de Dados e Cache
-venv/
-env/
-db.sqlite3
-__pycache__/
-*.pyc
-
-# IDEs e Sistema
-.vscode/
-.idea/
-.DS_Store
-
-
-backend/env.production
+Thumbs.db
