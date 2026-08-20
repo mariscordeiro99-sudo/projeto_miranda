@@ -185,7 +185,7 @@ def _run_ffprobe(ffprobe_path, file_path):
         return None
 
     try:
-        duration = json.loads(result.stdout)['format']['duration']
+        duration = json.loads(getattr(result, 'stdout', '') or '')['format']['duration']
         return float(duration)
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return None

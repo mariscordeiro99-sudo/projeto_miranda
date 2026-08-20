@@ -2367,7 +2367,7 @@ class AdminDashboardTests(APITestCase):
     def test_admin_logout_uses_custom_jazzmin_logo(self):
         self.client.force_login(self.admin_user)
 
-        response = self.client.get('/admin/logout/')
+        response = self.client.post('/admin/logout/')
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertContains(response, 'admin/img/nexa-logo.png')

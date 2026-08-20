@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AppRoutes } from '../../../routes/types/loginReg';
 import { useRegister } from '../hooks/useRegister';
@@ -56,9 +57,12 @@ const Register: React.FC = () => {
             alert('Cadastro realizado com sucesso! Você será redirecionado para o login.');
             navigate(AppRoutes.LOGIN);
             return;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Erro ao cadastrar usuário:', error);
-            if (error.response?.data?.detail) {
+            if (
+                axios.isAxiosError<{ detail?: string }>(error)
+                && error.response?.data?.detail
+            ) {
                 alert(`Erro: ${error.response.data.detail}`);
             } else {
                 alert('Erro ao cadastrar. Verifique os dados e tente novamente.');

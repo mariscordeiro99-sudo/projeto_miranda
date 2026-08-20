@@ -343,8 +343,14 @@ class ChatMessage(models.Model):
         verbose_name_plural = 'Mensagens de chat'
         ordering = ['created_at']
         indexes = [
-            models.Index(fields=['sender', 'receiver', 'created_at']),
-            models.Index(fields=['receiver', 'read_at']),
+            models.Index(
+                fields=['sender', 'receiver', 'created_at'],
+                name='api_chatmes_sender__051465_idx',
+            ),
+            models.Index(
+                fields=['receiver', 'read_at'],
+                name='api_chatmes_receive_7ba4a8_idx',
+            ),
         ]
 
     def __str__(self):
